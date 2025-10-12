@@ -2,7 +2,7 @@ from typing import Annotated, Sequence
 from fastapi import FastAPI, HTTPException, Path
 from fastapi import Depends
 from sqlmodel import Session, text
-from services.surah_service import SurahService as surahService
+from services.surah_service import SurahService
 from config.database import get_db_session
 from starlette import status
 from model.surah import SurahDetails
@@ -28,7 +28,8 @@ def get_ayahs_by_surah(
     surah_no: Annotated[int, Path(ge=1, le=114, title="Surah Number", description="Surah Number")], 
     session: SessionDep
     ):
-    surahDetails: list[SurahDetails] = surahService.get_surahs(surah_no, session)
+    surah_service = SurahService()
+    surahDetails: list[SurahDetails] = surah_service.get_surahs(surah_no, session)
     if not surahDetails:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ayahs not found")
     
