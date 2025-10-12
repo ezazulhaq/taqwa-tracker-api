@@ -1,10 +1,8 @@
-from typing import Annotated, Sequence
-from fastapi import FastAPI, HTTPException, Path
-from fastapi import Depends
+from typing import Annotated
+from fastapi import FastAPI, HTTPException, Path, Depends, status
 from sqlmodel import Session, text
 from services.surah_service import SurahService
 from config.database import get_db_session
-from starlette import status
 from model.surah import SurahDetails
 
 SessionDep = Annotated[Session, Depends(get_db_session)]
@@ -19,7 +17,7 @@ async def status_check():
 def test_db_connection(session: SessionDep):
     try:
         session.exec(text("SELECT 1"))
-        raise HTTPException(status_code=status.HTTP_200_OK, detail="Database connection successful ✅")
+        return {"status": "OK", "message": "Database connection successful ✅"}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database connection failed: {str(e)}")
 
@@ -28,9 +26,12 @@ def get_ayahs_by_surah(
     surah_no: Annotated[int, Path(ge=1, le=114, title="Surah Number", description="Surah Number")], 
     session: SessionDep
     ):
-    surah_service = SurahService()
-    surahDetails: list[SurahDetails] = surah_service.get_surahs(surah_no, session)
-    if not surahDetails:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ayahs not found")
-    
-    return surahDetails
+    try:
+        surah_service = SurahService()
+        surahDetails: list[SurahDetails] = surah_service.get_surahs(surah_no, session)
+        if not surahDetails:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ayahs not found")
+        
+        return surahDetails
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching surahs: {str(e)}")
