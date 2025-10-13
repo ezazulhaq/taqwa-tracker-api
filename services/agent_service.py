@@ -202,7 +202,12 @@ class AgentService:
         try:
             response = openrouter.openrouter_client.chat.completions.create(
                 model=os.getenv("OPENROUTER_MODEL_OPENAI"),
-                messages=[{"role": "user", "content": planning_prompt}],
+                messages=[
+                    {
+                        "role": "user", 
+                        "content": planning_prompt
+                    }
+                ],
                 max_tokens=800,
                 temperature=0.3
             )
@@ -303,6 +308,7 @@ class AgentService:
             4. Is compassionate and respectful
             5. Offers practical guidance when applicable
             6. Maintains authentic Islamic perspective
+            7. Strictly limit the response content to not more than 150 words
 
             Keep the response conversational and helpful while being thorough.
         """
@@ -316,8 +322,8 @@ class AgentService:
                         "content": synthesis_prompt
                     }
                 ],
-                max_tokens=600,
-                temperature=0.7
+                max_tokens=4096,
+                temperature=0.2
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -370,7 +376,7 @@ class AgentService:
             
             formatted_results = []
             for r in results:
-                formatted_results.append(f"Score: {r['score']:.3f}\nSource: {r['source']}\nContent: {r['content']}...")
+                formatted_results.append(f"Score: {r['score']:.3f}\nSource: {r['source']}\nContent: {r['content']}")
             
             return f"Found {len(results)} results:\n" + "\n\n".join(formatted_results)
                 
