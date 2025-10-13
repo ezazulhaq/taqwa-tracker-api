@@ -405,7 +405,9 @@ class AgentService:
                 data = response.json()
                 timings = data["data"]["timings"]
                 
-                prayer_times = f"Prayer times for {location} on {date}:\n"
+                # Sanitize location input to prevent XSS
+                safe_location = location.replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#x27;')
+                prayer_times = f"Prayer times for {safe_location} on {date}:\n"
                 prayer_times += f"Fajr: {timings['Fajr']}\n"
                 prayer_times += f"Dhuhr: {timings['Dhuhr']}\n"
                 prayer_times += f"Asr: {timings['Asr']}\n"
