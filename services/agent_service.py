@@ -336,38 +336,42 @@ class AgentService:
         else:
             return "I'm here to help you with Islamic guidance, prayer times, Quranic knowledge, and more. What would you like to know?"
     
-    async def search_islamic_knowledge(self, query: str, source_type: str = "all") -> str:
+    async def search_islamic_knowledge(self, query: str, source_name: str = "all") -> str:
         """Search Islamic knowledge in Pinecone"""
         try:
+            stats = pinecone.index.describe_index_stats()
+            if stats.total_vector_count == 0:
+                return "Index is empty"
+            
             query_embedding = self.generate_embedding(query)
             if not query_embedding:
-                return "Unable to search at this time"
+                return "Embedding failed"
             
             search_results = pinecone.index.query(
                 vector=query_embedding,
                 top_k=5,
                 include_metadata=True,
-                filter={"source_type": source_type} if source_type != "all" else None
+                namespace="sahih_bukhari"
             )
+            
+            if not search_results.matches:
+                return "No matches found"
             
             results = []
             for match in search_results.matches:
-                if match.score > 0.7:
-                    results.append({
-                        "content": match.metadata.get("text", ""),
-                        "source": match.metadata.get("source", ""),
-                        "score": match.score
-                    })
+                results.append({
+                    "content": match.metadata.get("text", ""),
+                    "source": match.metadata.get("source_name", ""),
+                    "hadith_no": match.metadata.get("hadith_no", ""),
+                    "score": match.score
+                })
             
-            if results:
-                return f"Found {len(results)} relevant Islamic sources:\n" + \
-                       "\n\n".join([f"Source: {r['source']}\nContent: {r['content'][:300]}..." 
-                                   for r in results[:3]])
-            else:
-                return "No highly relevant Islamic sources found for this query."
+            return f"Found {len(results)} results:\n" + \
+                   "\n\n".join([f"Score: {r['score']:.3f}\nSource: {r['source']}\nContent: {r['content']}..." 
+                               for r in results])
                 
         except Exception as e:
-            return f"Error searching Islamic knowledge: {str(e)}"
+            return f"Error: {str(e)}"
     
     async def get_prayer_times(self, location: str, date: str = None, method: int = 2) -> str:
         """Get prayer times using Aladhan API"""
