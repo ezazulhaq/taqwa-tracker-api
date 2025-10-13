@@ -310,7 +310,12 @@ class AgentService:
         try:
             response = openrouter.openrouter_client.chat.completions.create(
                 model=os.getenv("OPENROUTER_MODEL_OPENAI"),
-                messages=[{"role": "user", "content": synthesis_prompt}],
+                messages=[
+                    {
+                        "role": "user", 
+                        "content": synthesis_prompt
+                    }
+                ],
                 max_tokens=600,
                 temperature=0.7
             )
@@ -322,14 +327,11 @@ class AgentService:
     # Tool implementation methods
     async def direct_response(self, message: str) -> str:
         """Handle direct responses for greetings and casual conversation"""
-        greetings = ["hi", "hello", "hey"]
-        islamic_greetings = ["salam", "assalam", "assalamu alaikum"]
-        
         message_lower = message.lower()
         
-        if any(greeting in message_lower for greeting in islamic_greetings):
+        if any(greeting in message_lower for greeting in ["salam", "assalam", "assalamu alaikum"]):
             return "Wa alaikum assalam wa rahmatullahi wa barakatuh! How can I assist you with your Islamic needs today?"
-        elif any(greeting in message_lower for greeting in greetings):
+        elif any(greeting in message_lower for greeting in ["hi", "hello", "hey"]):
             return "Hello! I'm your Islamic AI assistant. I can help you with prayer times, Quranic guidance, Islamic knowledge, and more. How can I assist you today?"
         elif "how are you" in message_lower:
             return "Alhamdulillah, I'm here and ready to help you with any Islamic guidance or information you need. How can I assist you?"
@@ -366,9 +368,11 @@ class AgentService:
                     "score": match.score
                 })
             
-            return f"Found {len(results)} results:\n" + \
-                   "\n\n".join([f"Score: {r['score']:.3f}\nSource: {r['source']}\nContent: {r['content']}..." 
-                               for r in results])
+            formatted_results = []
+            for r in results:
+                formatted_results.append(f"Score: {r['score']:.3f}\nSource: {r['source']}\nContent: {r['content']}...")
+            
+            return f"Found {len(results)} results:\n" + "\n\n".join(formatted_results)
                 
         except Exception as e:
             return f"Error: {str(e)}"
