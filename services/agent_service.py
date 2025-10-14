@@ -38,6 +38,16 @@ class AgentService:
             function=self.direct_response
         )
         
+        # Restrict Query Tool for non-Islamic queries
+        self.tools["restrict_query"] = AgentTool(
+            name="restrict_query",
+            description="Restrict non-Islamic queries with appropriate message",
+            parameters={
+                "message": {"type": "string", "description": "User's message that was restricted"}
+            },
+            function=self.restrict_query
+        )
+        
         # Islamic Knowledge Search Tool
         self.tools["search_islamic_knowledge"] = AgentTool(
             name="search_islamic_knowledge",
@@ -143,8 +153,43 @@ class AgentService:
             "tools_used": list(set([step["tool"] for step in plan["steps"]]))
         }
     
+    def validate_islamic_query(self, user_message: str) -> bool:
+        """Validate if the query is Islamic-related"""
+        islamic_keywords = [
+            "islam", "islamic", "quran", "quranic", "hadith", "sunnah", "prophet", "muhammad", 
+            "allah", "prayer", "salah", "dua", "mosque", "masjid", "halal", "haram", 
+            "ramadan", "hajj", "umrah", "zakat", "shahada", "iman", "tawhid", "fiqh",
+            "salam", "assalam", "assalamu alaikum", "bismillah", "alhamdulillah", "inshallah",
+            "surah", "ayah", "verse", "qibla", "wudu", "ghusl", "tahajjud", "fajr", "dhuhr",
+            "asr", "maghrib", "isha", "jummah", "friday", "eid", "mecca", "medina", "kaaba"
+        ]
+        
+        greetings = ["hi", "hello", "hey", "salam", "assalam", "assalamu alaikum", "how are you", "good morning", "good evening"]
+        
+        message_lower = user_message.lower()
+        
+        # Allow greetings
+        if any(greeting in message_lower for greeting in greetings):
+            return True
+            
+        # Check for Islamic keywords
+        return any(keyword in message_lower for keyword in islamic_keywords)
+
     async def analyze_intent_and_plan(self, user_message: str) -> Dict:
         """Analyze user intent and create execution plan"""
+        
+        # Validate if query is Islamic-related
+        if not self.validate_islamic_query(user_message):
+            return {
+                "intent": "non_islamic_query",
+                "complexity": "simple",
+                "steps": [{
+                    "action": "Restrict non-Islamic query",
+                    "tool": "restrict_query",
+                    "reasoning": "Query is not related to Islamic topics",
+                    "parameters": {"message": user_message}
+                }]
+            }
         
         # Check for simple greetings/casual messages first
         casual_patterns = ["hi", "hello", "hey", "salam", "assalam", "good morning", "good evening", "how are you"]
@@ -263,12 +308,12 @@ class AgentService:
                 }
             else:
                 return {
-                    "intent": "General conversation",
+                    "intent": "Non-Islamic query",
                     "complexity": "simple",
                     "steps": [{
-                        "action": "Provide general response",
-                        "tool": "direct_response",
-                        "reasoning": "Non-Islamic general inquiry",
+                        "action": "Restrict non-Islamic query",
+                        "tool": "restrict_query",
+                        "reasoning": "Query is not related to Islamic topics",
                         "parameters": {"message": user_message}
                     }]
                 }
@@ -331,6 +376,12 @@ class AgentService:
             return "I apologize, but I encountered an issue generating a response. Please try again."
     
     # Tool implementation methods
+    async def restrict_query(self, message: str) -> str:
+        """Restrict non-Islamic queries"""
+        return ("I'm an Islamic AI assistant designed to help with religious guidance, Quranic knowledge, "
+                "prayer times, and Islamic practices. I can only assist with Islamic-related queries. "
+                "Please ask me about Islamic topics, and I'll be happy to help!")
+    
     async def direct_response(self, message: str) -> str:
         """Handle direct responses for greetings and casual conversation"""
         message_lower = message.lower()
