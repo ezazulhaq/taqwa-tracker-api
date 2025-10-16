@@ -3,3 +3,10 @@ sqlmodel
 uvicorn
 python-dotenv
 psycopg2-binary
+pinecone
+openai
+google-generativeai
+requests
+geopy
+pytz
+hijri-converter
