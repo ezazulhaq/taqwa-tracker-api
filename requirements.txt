@@ -10,3 +10,8 @@ requests
 geopy
 pytz
 hijri-converter
+httpx
+jwt
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
