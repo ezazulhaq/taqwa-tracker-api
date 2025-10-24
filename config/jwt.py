@@ -5,7 +5,7 @@ load_dotenv()
 
 class JWTConfig:
     
-    def __init__(self, secret_key, algorithm, access_token_expire_minutes, refresh_token_expire_days):
+    def __init__(self, secret_key: str, algorithm: str, access_token_expire_minutes: int, refresh_token_expire_days: int):
         self.__secret_key = secret_key
         self.__algorithm = algorithm
         self.__access_token_expire_minutes = access_token_expire_minutes
@@ -31,6 +31,6 @@ class JWTConfig:
 config = JWTConfig(
     secret_key=os.getenv("JWT_SECRET_KEY"),
     algorithm=os.getenv("JWT_ALGORITHM"),
-    access_token_expire_minutes=os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES"),
-    refresh_token_expire_days=os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS")
+    access_token_expire_minutes=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES")),
+    refresh_token_expire_days=int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS"))
 )
