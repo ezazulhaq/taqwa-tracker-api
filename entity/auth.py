@@ -1,14 +1,17 @@
 
 from datetime import datetime, timezone
 from typing import Optional
+from uuid import UUID
 from sqlmodel import Field, SQLModel
+from sqlalchemy import Column, text
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 
 
 class User(SQLModel, table=True):
     """User database model"""
     __tablename__ = "users"
     
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: Optional[UUID] = Field(default=None, sa_column=Column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")))
     email: str = Field(unique=True, index=True)
     hashed_password: str
     full_name: Optional[str] = None
@@ -25,8 +28,8 @@ class RefreshToken(SQLModel, table=True):
     """Refresh token database model"""
     __tablename__ = "refresh_tokens"
     
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id")
+    id: Optional[UUID] = Field(default=None, sa_column=Column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")))
+    user_id: UUID = Field(foreign_key="users.id")
     token: str = Field(unique=True, index=True)
     expires_at: datetime
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

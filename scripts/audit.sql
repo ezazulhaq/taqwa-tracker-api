@@ -1,8 +1,8 @@
 
 -- Audit logs table
 CREATE TABLE audit_logs (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
     event_type VARCHAR NOT NULL,
     email VARCHAR,
     ip_address VARCHAR,

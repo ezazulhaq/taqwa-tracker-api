@@ -1,6 +1,6 @@
 -- Users table
 CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR UNIQUE NOT NULL,
     hashed_password VARCHAR NOT NULL,
     full_name VARCHAR,
@@ -19,8 +19,8 @@ CREATE INDEX idx_users_email ON users(email);
 
 -- Refresh tokens table
 CREATE TABLE refresh_tokens (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
     token VARCHAR UNIQUE NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
