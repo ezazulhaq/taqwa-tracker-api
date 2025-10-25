@@ -19,10 +19,10 @@ from services.auth import AuthService
 from services.email import EmailService
 from services.security import SecurityService
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["Authentication Services"])
 
 # OAuth2
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 Oauth2Dep = Annotated[str, Depends(oauth2_scheme)]
 
 SessionDep = Annotated[Session, Depends(database.get_db_session)]
@@ -33,7 +33,7 @@ AuditDep = Annotated[AuditService, Depends()]
 EmailDep = Annotated[EmailService, Depends()]
 
 
-@router.post("/auth/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def signup(
     user_data: UserCreate,
     background_tasks: BackgroundTasks,
@@ -188,7 +188,7 @@ async def login(
         refresh_token=refresh_token
     )
 
-@router.post("/auth/login", response_model=Token)
+@router.post("/login", response_model=Token)
 async def login_json(
     email: EmailStr,
     password: str,
@@ -258,7 +258,7 @@ async def login_json(
         refresh_token=refresh_token
     )
 
-@router.post("/auth/refresh", response_model=Token)
+@router.post("/refresh", response_model=Token)
 async def refresh_access_token(
     refresh_token: str,
     session: SessionDep,
@@ -316,7 +316,7 @@ async def refresh_access_token(
     except InvalidTokenError:
         raise credentials_exception
 
-@router.post("/auth/logout")
+@router.post("/logout")
 async def logout(
     token: Oauth2Dep,
     refresh_token: Optional[str] = None,
@@ -354,7 +354,7 @@ async def logout(
     
     return {"message": "Successfully logged out"}
 
-@router.post("/auth/verify-email")
+@router.post("/verify-email")
 async def verify_email(
     data: EmailVerification,
     background_tasks: BackgroundTasks,
@@ -410,7 +410,7 @@ async def verify_email(
             detail="Invalid or expired verification token"
         )
 
-@router.post("/auth/resend-verification")
+@router.post("/resend-verification")
 async def resend_verification(
     email: EmailStr,
     background_tasks: BackgroundTasks,
@@ -457,7 +457,7 @@ async def resend_verification(
     
     return {"message": "Verification email sent"}
 
-@router.post("/auth/recover")
+@router.post("/recover")
 async def recover_password(
     data: PasswordRecovery,
     background_tasks: BackgroundTasks,
@@ -494,7 +494,7 @@ async def recover_password(
         "email": data.email
     }
 
-@router.post("/auth/reset-password")
+@router.post("/reset-password")
 async def reset_password(
     data: PasswordReset,
     session: SessionDep,

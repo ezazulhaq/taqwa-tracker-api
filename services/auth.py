@@ -19,7 +19,7 @@ from services.audit import AuditService
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # OAuth2
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 Oauth2Dep = Annotated[str, Depends(oauth2_scheme)]
 
 SessionDep = Annotated[Session, Depends(database.get_db_session)]
