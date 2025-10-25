@@ -10,7 +10,7 @@ from model.user import SessionInfo, UserResponse
 from services.auth import AuthService
 from starlette import status
 
-router = APIRouter()
+router = APIRouter(prefix="/user", tags=["User Services"])
 
 # OAuth2
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
@@ -20,7 +20,7 @@ SessionDep = Annotated[Session, Depends(database.get_db_session)]
 
 AuthDep = Annotated[AuthService, Depends()]
 
-@router.get("/users/me", response_model=UserResponse)
+@router.get("/me", response_model=UserResponse)
 async def read_users_me(
     token: Oauth2Dep,
     session: SessionDep,
@@ -33,7 +33,7 @@ async def read_users_me(
     current_user = await auth.get_current_user(token, session)
     return current_user
 
-@router.put("/users/me", response_model=UserResponse)
+@router.put("/me", response_model=UserResponse)
 async def update_user(
     token: Oauth2Dep,
     session: SessionDep,
@@ -57,7 +57,7 @@ async def update_user(
     
     return current_user
 
-@router.delete("/users/me")
+@router.delete("/me")
 async def delete_user(
     token: Oauth2Dep,
     session: SessionDep,
@@ -80,7 +80,7 @@ async def delete_user(
 # SESSION MANAGEMENT ENDPOINTS
 # ============================================================================
 
-@router.get("/users/me/sessions", response_model=list[SessionInfo])
+@router.get("/me/sessions", response_model=list[SessionInfo])
 async def get_active_sessions(
     token: Oauth2Dep,
     session: SessionDep,
@@ -111,7 +111,7 @@ async def get_active_sessions(
     
     return sessions
 
-@router.delete("/users/me/sessions/{session_id}")
+@router.delete("/me/sessions/{session_id}")
 async def revoke_session(
     session_id: int,
     token: Oauth2Dep,
@@ -142,7 +142,7 @@ async def revoke_session(
     
     return {"message": "Session revoked successfully"}
 
-@router.delete("/users/me/sessions")
+@router.delete("/me/sessions")
 async def revoke_all_sessions(
     token: Oauth2Dep,
     session: SessionDep,

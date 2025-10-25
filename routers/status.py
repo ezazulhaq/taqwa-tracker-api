@@ -4,7 +4,7 @@ from sqlmodel import Session, text
 from config import database
 from starlette import status
 
-router = APIRouter()
+router = APIRouter(tags=["Status Services"])
 
 SessionDep = Annotated[Session, Depends(database.get_db_session)]
 
