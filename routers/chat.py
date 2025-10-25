@@ -12,7 +12,7 @@ from services.agent_service import AgentService
 from services.chat_service import ChatService
 from services.user_service import UserService
 
-router = APIRouter(prefix="/chat")
+router = APIRouter(prefix="/chat", tags=["Chatbot Services"])
 
 SessionDep = Annotated[Session, Depends(database.get_db_session)]
 
