@@ -46,7 +46,11 @@ class AuthService:
         else:
             expire = datetime.now(timezone.utc) + timedelta(minutes=jwt_config.access_token_expire_minutes)
         
-        to_encode.update({"exp": expire, "type": "access"})
+        # Only set type to "access" if not already specified
+        if "type" not in to_encode:
+            to_encode["type"] = "access"
+        
+        to_encode["exp"] = expire
         encoded_jwt = jwt.encode(to_encode, jwt_config.secret_key, algorithm=jwt_config.algorithm)
         return encoded_jwt
 
