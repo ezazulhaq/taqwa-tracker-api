@@ -2,33 +2,47 @@ import logging
 import uuid
 from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Header
-from sqlmodel import Session, select
+from fastapi.security import OAuth2PasswordBearer
+from sqlmodel import Session, delete, select
 from starlette import status
 
 from config import database
 from entity.chat import Conversation, Message
 from model.chat import ChatRequest, ChatResponse
 from services.agent_service import AgentService
+from services.auth import AuthService
 from services.chat_service import ChatService
 from services.user_service import UserService
 
 router = APIRouter(prefix="/chat", tags=["Chatbot Services"])
 
+# OAuth2
+Oauth2Dep = Annotated[str, Depends(OAuth2PasswordBearer(tokenUrl="auth/token"))]
+
 SessionDep = Annotated[Session, Depends(database.get_db_session)]
+
+AuthDep = Annotated[AuthService, Depends()]
+
+ChatDep = Annotated[ChatService, Depends()]
+
+AgentDep = Annotated[AgentService, Depends()]
 
 @router.post("/agent", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
+    token: Oauth2Dep,
     session: SessionDep,
-    authorization: Annotated[Optional[str], Header()] = None
+    auth: AuthDep,
+    agent: AgentDep,
+    chat: ChatDep
 ):
     """Main Agentic chat endpoint"""
-    user_id = "51d39d36-bed6-4adf-9ce0-851e17a4e6de" #get_user_from_token(authorization)
+    # Get current user from token
+    current_user = await auth.get_current_user(token, session)
     
-    chat_service = ChatService()
     # Create new conversation if not provided or invalid UUID
     if not request.conversation_id:
-        conversation_id = chat_service.create_conversation(user_id=user_id, session=session)
+        conversation_id = chat.create_conversation(user_id=current_user.id, session=session)
     else:
         try:
             # Validate UUID format
@@ -36,12 +50,9 @@ async def chat(
             conversation_id = request.conversation_id
         except ValueError:
             # Invalid UUID, create new conversation
-            conversation_id = chat_service.create_conversation(user_id=user_id, session=session)
+            conversation_id = chat.create_conversation(user_id=current_user.id, session=session)
     
     try:
-        # Initialize agent
-        agent = AgentService()
-        
         # Update user profile if location provided
         if request.location:
             agent.user_profile.location = request.location
@@ -49,16 +60,16 @@ async def chat(
             agent.user_profile.timezone = request.timezone
         
         # Save user message
-        user_message_id = chat_service.save_message(conversation_id, "user", request.message, metadata=None, session=session)
+        user_message_id = chat.save_message(conversation_id, "user", request.message, metadata=None, session=session)
         
         # Get conversation history for context
-        history = chat_service.get_conversation_history(conversation_id, user_id, session=session)
+        history = chat.get_conversation_history(conversation_id, current_user.id, session=session)
         
         # Agent planning and execution
         agent_result = await agent.plan_and_execute(request.message, history)
         
         # Save agent response with metadata
-        bot_message_id = chat_service.save_message(
+        bot_message_id = chat.save_message(
             conversation_id, 
             "assistant", 
             agent_result["response"],
@@ -83,9 +94,16 @@ async def chat(
 
 
 @router.get("/agent/tools")
-async def get_available_tools():
+async def get_available_tools(
+    token: Oauth2Dep,
+    session: SessionDep,
+    auth: AuthDep,
+    agent: AgentDep
+):
     """Get list of available agent tools"""
-    agent = AgentService()
+    # Get current user from token
+    await auth.get_current_user(token, session)
+    
     tools_info = {}
     for name, tool in agent.tools.items():
         tools_info[name] = {
@@ -99,35 +117,33 @@ async def get_available_tools():
 @router.get("/conversations/{conversation_id}")
 async def get_conversation(
     conversation_id: str,
+    token: Oauth2Dep,
     session: SessionDep,
-    authorization: Optional[str] = Header(None)
+    auth: AuthDep,
+    chat: ChatDep
 ):
     """Get conversation history"""
-    user_service = UserService()
-    user_id = user_service.get_user_from_token(authorization)
+    # Get current user from token
+    current_user = await auth.get_current_user(token, session)
         
-    chat_service = ChatService()
-    
     try:
-        statement = select(Conversation).where(Conversation.id == conversation_id)
+        statement = select(Conversation).where(Conversation.id == conversation_id and Conversation.user_id == current_user.id)
         # conv_result = supabase.table("conversations").select("*").eq("id", conversation_id).single().execute()
-        conv_result = session.exec(statement).first()
+        conversation = session.exec(statement).first()
         
-        if not conv_result.data:
-            raise HTTPException(status_code=404, detail="Conversation not found")
+        if not conversation.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+                
+        #if current_user.id and conversation["user_id"] and conversation["user_id"] != current_user.id:
+        #    raise HTTPException(status_code=403, detail="Access denied to conversation")
         
-        conversation = conv_result.data
-        
-        if user_id and conversation.get("user_id") and conversation["user_id"] != user_id:
-            raise HTTPException(status_code=403, detail="Access denied to conversation")
-        
-        messages = chat_service.get_conversation_history(conversation_id, user_id, session)
+        messages = chat.get_conversation_history(conversation_id, current_user.id, session)
         
         return {
             "conversation_id": conversation_id,
             "messages": messages,
-            "created_at": conversation["created_at"],
-            "updated_at": conversation["updated_at"]
+            "created_at": conversation.created_at,
+            "updated_at": conversation.updated_at
         }
         
     except HTTPException:
@@ -138,21 +154,19 @@ async def get_conversation(
 
 @router.get("/conversations")
 async def get_user_conversations(
+    token: Oauth2Dep,
     session: SessionDep,
-    authorization: Optional[str] = Header(None)
+    auth: AuthDep
 ):
     """Get user's conversation list"""
-    user_service = UserService()
-    user_id = user_service.get_user_from_token(authorization)
-    
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    # Get current user from token
+    current_user = await auth.get_current_user(token, session)
     
     try:
         #result = supabase.table("conversations").select("*").eq("user_id", user_id).order("updated_at", desc=True).execute()
-        statement = select(Conversation).where(Conversation.user_id == user_id).order_by(Conversation.updated_at.desc())
+        statement = select(Conversation).where(Conversation.user_id == current_user.id).order_by(Conversation.updated_at.desc())
         result = session.exec(statement).all()
-        return {"conversations": result.data}
+        return {"conversations": result}
     except Exception as e:
         print(f"Error getting user conversations: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve conversations")
@@ -160,28 +174,27 @@ async def get_user_conversations(
 @router.delete("/conversations/{conversation_id}")
 async def delete_conversation(
     conversation_id: str,
+    token: Oauth2Dep,
     session: SessionDep,
-    authorization: Optional[str] = Header(None),
+    auth: AuthDep
 ):
     """Delete a conversation"""
-    user_service = UserService()
-    user_id = user_service.get_user_from_token(authorization)
-    
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    # Get current user from token
+    current_user = await auth.get_current_user(token, session)
     
     try:
         #conv_result = supabase.table("conversations").select("user_id").eq("id", conversation_id).single().execute()
-        conv_stm=select(Conversation).where(Conversation.id == conversation_id)
-        conv_result = session.exec(conv_stm).first()
+        statement=select(Conversation).where(Conversation.id == conversation_id and Conversation.user_id == current_user.id)
+        conv_result = session.exec(statement).first()
         
-        if not conv_result.data or conv_result.data.get("user_id") != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
+        if not conv_result:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
         
         #supabase.table("messages").delete().eq("conversation_id", conversation_id).execute()
-        session.exec(select(Message).where(Message.conversation_id == conversation_id)).delete()
+        session.exec(delete(Message).where(Message.conversation_id == conversation_id))
         #supabase.table("conversations").delete().eq("id", conversation_id).execute()
-        session.exec(select(Conversation).where(Conversation.id == conversation_id)).delete()
+        session.exec(delete(Conversation).where(Conversation.id == conversation_id))
+        session.commit()
         
         return {"message": "Conversation deleted successfully"}
         

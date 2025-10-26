@@ -41,7 +41,7 @@ class ChatService:
                 "conversation_id": conversation_id,
                 "role": role,
                 "content": content,
-                "message_metadata": json.dumps(metadata) if metadata else None,
+                "message_metadata": metadata if metadata else None,
                 "created_at": datetime.now(timezone.utc)
             }
             statement = insert(Message).values(**message_data)
