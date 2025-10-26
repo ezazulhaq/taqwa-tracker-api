@@ -31,6 +31,6 @@ class ResendConfig:
 config = ResendConfig(
     api_key=os.getenv("RESEND_API_KEY"),
     from_email=os.getenv("RESEND_FROM_EMAIL"),
-    app_name=os.getenv("APP_NAME"),
-    front_end_url=os.getenv("FRONT_END_URL")
+    app_name=os.getenv("APP_NAME", "The Taqwa Tracker"),
+    front_end_url=os.getenv("FRONTEND_URL")
 )
