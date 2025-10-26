@@ -9,10 +9,9 @@ from starlette import status
 from config import database
 from entity.chat import Conversation, Message
 from model.chat import ChatRequest, ChatResponse
-from services.agent_service import AgentService
+from services.agent import AgentService
 from services.auth import AuthService
-from services.chat_service import ChatService
-from services.user_service import UserService
+from services.chat import ChatService
 
 router = APIRouter(prefix="/chat", tags=["Chatbot Services"])
 
