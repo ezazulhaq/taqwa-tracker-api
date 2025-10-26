@@ -8,7 +8,6 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 from config import openrouter, pinecone, gemini
-from entity.user import UserProfile
 from model.agent import AgentTool
 from model.chat import AgentStep
 from geopy.geocoders import Nominatim
@@ -20,7 +19,6 @@ load_dotenv()
 class AgentService:
     def __init__(self):
         self.tools = {}
-        self.user_profile = UserProfile()
         self.conversation_context = []
         self.agent_steps = []
         self.register_tools()

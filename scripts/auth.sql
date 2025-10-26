@@ -14,6 +14,14 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+-- Add user profile columns to users table
+ALTER TABLE users 
+ADD COLUMN location TEXT,
+ADD COLUMN timezone TEXT,
+ADD COLUMN preferred_madhab TEXT,
+ADD COLUMN language TEXT DEFAULT 'en',
+ADD COLUMN preferences JSONB DEFAULT '{}';
+
 -- Create index on email for faster lookups
 CREATE INDEX idx_users_email ON users(email);
 

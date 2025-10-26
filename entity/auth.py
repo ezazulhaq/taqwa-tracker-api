@@ -1,9 +1,9 @@
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
-from sqlmodel import Field, SQLModel
-from sqlalchemy import Column, text
+from sqlmodel import Field, SQLModel, JSON, Column
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 
 
@@ -21,6 +21,11 @@ class User(SQLModel, table=True):
     failed_login_attempts: int = Field(default=0)
     locked_until: Optional[datetime] = None
     last_login: Optional[datetime] = None
+    location: Optional[str] = None
+    timezone: Optional[str] = None
+    preferred_madhab: Optional[str] = None
+    language: Optional[str] = Field(default="en")
+    preferences: Optional[Dict[str, Any]] = Field(default_factory=dict, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

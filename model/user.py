@@ -4,14 +4,6 @@ from uuid import UUID
 from pydantic import BaseModel, EmailStr
 
 
-class UserProfile(BaseModel):
-    user_id: Optional[str]
-    location: Optional[str]
-    timezone: Optional[str]
-    preferred_madhab: Optional[str]
-    language: Optional[str]
-
-
 class Token(BaseModel):
     access_token: str
     token_type: str
