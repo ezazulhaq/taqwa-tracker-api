@@ -295,7 +295,7 @@ async def refresh_access_token(
             raise credentials_exception
         
         # Get user
-        user = session.get(User, int(user_id))
+        user = session.get(User, user_id)
         if not user or not user.is_active:
             raise credentials_exception
         
