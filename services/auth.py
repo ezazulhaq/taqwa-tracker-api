@@ -132,7 +132,10 @@ class AuthService:
             
             session.add(user)
             session.commit()
-            return None
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication Failed"
+            )
         
         # Reset failed attempts on successful login
         if user.failed_login_attempts > 0:
