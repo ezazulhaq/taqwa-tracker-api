@@ -462,7 +462,7 @@ async def recover_password(
     data: PasswordRecovery,
     background_tasks: BackgroundTasks,
     session: SessionDep,
-    auth: AuditDep,
+    auth: AuthDep,
     mail: EmailDep
 ):
     """
