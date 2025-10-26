@@ -8,7 +8,7 @@ from model.surah import SurahDetails
 from services.surah_service import SurahService
 from starlette import status
 
-router = APIRouter(prefix="/quran")
+router = APIRouter(prefix="/quran", tags=["Quran Services"])
 
 SessionDep = Annotated[Session, Depends(get_db_session)]
 
