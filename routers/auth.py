@@ -1,5 +1,4 @@
 import jwt
-from jwt import PyJWTError
 
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
@@ -313,7 +312,7 @@ async def refresh_access_token(
             refresh_token=refresh_token
         )
         
-    except PyJWTError:
+    except Exception:
         raise credentials_exception
 
 @router.post("/logout")
@@ -404,7 +403,7 @@ async def verify_email(
         
         return {"message": "Email verified successfully"}
         
-    except PyJWTError:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired verification token"
@@ -544,7 +543,7 @@ async def reset_password(
         
         return {"message": "Password successfully reset"}
         
-    except PyJWTError:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired reset token"
