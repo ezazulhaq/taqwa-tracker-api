@@ -1,11 +1,12 @@
-from typing import Annotated, Optional
+from typing import Annotated, List, Optional
 from fastapi import APIRouter, Depends
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 from config import database
 
-from entity.audit import AuditLog
-from services.auth import AuthService
+from audit.entity import AuditLog
+from audit.model import AuditLogsResponse
+from auth.service import AuthService
 
 router = APIRouter(prefix="/audit", tags=["Audit Services"])
 
@@ -16,7 +17,7 @@ SessionDep = Annotated[Session, Depends(database.get_db_session)]
 
 AuthDep = Annotated[AuthService, Depends()]
 
-@router.get("/audit-logs")
+@router.get("/audit-logs", response_model=List[AuditLogsResponse])
 async def get_all_audit_logs(
     token: Oauth2Dep,
     session: SessionDep,
@@ -38,14 +39,4 @@ async def get_all_audit_logs(
     statement = statement.limit(limit)
     logs = session.exec(statement).all()
     
-    return [{
-        "id": log.id,
-        "user_id": log.user_id,
-        "email": log.email,
-        "event_type": log.event_type,
-        "ip_address": log.ip_address,
-        "user_agent": log.user_agent,
-        "success": log.success,
-        "details": log.details,
-        "created_at": log.created_at
-    } for log in logs]
+    return logs

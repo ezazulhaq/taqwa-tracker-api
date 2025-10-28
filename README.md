@@ -20,24 +20,48 @@ A comprehensive FastAPI microservice for Islamic guidance and Quranic data acces
 taqwa-tracker-api/
 ├── config/
 │   ├── database.py          # Database configuration
+│   ├── email.py            # Email service configuration
 │   ├── gemini.py           # Google Gemini AI configuration
+│   ├── jwt.py              # JWT authentication configuration
 │   ├── openrouter.py       # OpenRouter LLM configuration
 │   └── pinecone.py         # Pinecone vector DB configuration
-├── entity/
-│   ├── agent.py            # Agent execution entities
-│   ├── chat.py             # Chat and conversation entities
-│   ├── surah.py            # Quranic data entities
-│   └── user.py             # User profile entities
-├── model/
-│   ├── agent.py            # Agent response models
-│   ├── chat.py             # Chat request/response models
-│   ├── surah.py            # Surah response models
-│   └── user.py             # User profile models
-├── services/
-│   ├── agent_service.py    # AI agent business logic
-│   ├── chat_service.py     # Chat management service
-│   ├── surah_service.py    # Quranic data service
-│   └── user_service.py     # User management service
+├── agent/                   # AI Agent Domain
+│   ├── entity.py           # Agent execution entities
+│   ├── model.py            # Agent response models
+│   └── service.py          # AI agent business logic
+├── audit/                   # Audit & Logging Domain
+│   ├── entity.py           # Audit log entities
+│   └── model.py            # Audit response models
+├── auth/                    # Authentication Domain
+│   ├── entity.py           # User and token entities
+│   ├── model.py            # Auth request/response models
+│   └── service.py          # Authentication business logic
+├── chat/                    # Chat & Conversation Domain
+│   ├── entity.py           # Chat and conversation entities
+│   ├── model.py            # Chat request/response models
+│   └── service.py          # Chat management service
+├── quran/                   # Quranic Data Domain
+│   ├── entity.py           # Surah and ayah entities
+│   ├── model.py            # Quran response models
+│   └── service.py          # Quranic data service
+├── user/                    # User Profile Domain
+│   ├── entity.py           # User profile entities
+│   ├── model.py            # User profile models
+│   └── service.py          # User management service
+├── routers/                 # API Route Handlers
+│   ├── agent.py            # Agent endpoints
+│   ├── audit.py            # Audit endpoints
+│   ├── auth.py             # Authentication endpoints
+│   ├── chat.py             # Chat endpoints
+│   ├── quran.py            # Quran endpoints
+│   ├── status.py           # Health check endpoints
+│   └── user.py             # User profile endpoints
+├── services/                # Shared Services
+│   ├── audit.py            # Audit logging service
+│   ├── email.py            # Email service
+│   └── security.py         # Security utilities
+├── scripts/                 # Database Scripts
+│   └── auth.sql            # Authentication tables
 ├── main.py                 # FastAPI application
 ├── requirements.txt        # Dependencies
 ├── pyproject.toml          # Project configuration
@@ -103,8 +127,24 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `GET /` - Basic status check
 - `GET /health/db` - Database connection test
 
+### Authentication
+- `POST /auth/signup` - User registration with email verification
+- `POST /auth/token` - OAuth2 compatible login endpoint
+- `POST /auth/login` - JSON login endpoint
+- `POST /auth/refresh` - Refresh access token
+- `POST /auth/logout` - Logout and revoke tokens
+- `POST /auth/verify-email` - Verify email with token
+- `POST /auth/recover` - Password recovery
+- `POST /auth/reset-password` - Reset password with token
+
+### User Management
+- `GET /user/profile` - Get user profile
+- `PUT /user/profile` - Update user profile
+- `GET /user/sessions` - Get active sessions
+- `DELETE /user/sessions/{session_id}` - Revoke session
+
 ### Quranic Data
-- `GET /surahs/{surah_no}` - Get ayahs for a specific surah (1-114)
+- `GET /quran/surahs/{surah_no}` - Get ayahs for a specific surah (1-114)
   - **Parameters**: `surah_no` (integer, 1-114)
   - **Response**: List of ayah details with Arabic text and translations
 
@@ -129,6 +169,9 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
       "tools_used": ["list of tools"]
     }
     ```
+
+### Audit & Monitoring
+- `GET /audit/audit-logs` - Get user audit logs (authenticated)
 
 ## AI Agent Capabilities
 
@@ -159,6 +202,11 @@ The AI agent provides comprehensive Islamic assistance through various tools:
 - Islamic etiquette and manners guidance
 
 ## Database Schema
+
+### Authentication Tables
+- `users` - User accounts with UUID primary keys
+- `refresh_tokens` - JWT refresh token management
+- `audit_logs` - Security and activity audit trail
 
 ### Core Tables
 - `conversations` - Chat conversation management
@@ -225,10 +273,32 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ## Usage Examples
 
+### User Registration
+```bash
+curl -X POST "http://localhost:8000/auth/signup" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword",
+    "full_name": "John Doe"
+  }'
+```
+
+### User Login
+```bash
+curl -X POST "http://localhost:8000/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword"
+  }'
+```
+
 ### Basic Islamic Question
 ```bash
 curl -X POST "http://localhost:8000/chat" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -d '{
     "message": "What are the 5 pillars of Islam?"
   }'
@@ -238,6 +308,7 @@ curl -X POST "http://localhost:8000/chat" \
 ```bash
 curl -X POST "http://localhost:8000/chat" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -d '{
     "message": "What are today\'s prayer times?",
     "location": "New York, NY",
@@ -247,7 +318,7 @@ curl -X POST "http://localhost:8000/chat" \
 
 ### Quranic Verse Lookup
 ```bash
-curl -X GET "http://localhost:8000/surahs/1"
+curl -X GET "http://localhost:8000/quran/surahs/1"
 ```
 
 ## Contributing
