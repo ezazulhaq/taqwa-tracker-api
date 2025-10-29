@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 from fastapi import HTTPException
 from sqlmodel import Session, insert, select, update
 
-from entity.chat import Conversation, Message
+from chat.entity import Conversation, Message
 
 
 class ChatService:

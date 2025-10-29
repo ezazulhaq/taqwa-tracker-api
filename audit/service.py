@@ -2,7 +2,7 @@
 from typing import Optional
 from fastapi import Request
 from sqlmodel import Session
-from entity.audit import AuditLog
+from audit.entity import AuditLog
 
 
 class AuditService:

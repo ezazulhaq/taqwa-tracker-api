@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
-from entity.surah import VSurahDetails
-from model.surah import SurahDetails
+from quran.entity import VSurahDetails
+from quran.model import SurahDetails
 
 class QuranService:
     

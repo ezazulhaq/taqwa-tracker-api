@@ -7,11 +7,11 @@ from sqlmodel import Session, delete, select
 from starlette import status
 
 from config import database
-from entity.chat import Conversation, Message
-from model.chat import ChatRequest, ChatResponse
-from services.agent import AgentService
-from services.auth import AuthService
-from services.chat import ChatService
+from chat.entity import Conversation, Message
+from chat.model import ChatRequest, ChatResponse
+from shared.agent import AgentService
+from auth.service import AuthService
+from chat.service import ChatService
 
 router = APIRouter(prefix="/chat", tags=["Chatbot Services"])
 

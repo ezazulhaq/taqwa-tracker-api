@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlmodel import Session
 
 from config.database import get_db_session
-from model.surah import SurahDetails
-from services.quran import QuranService
+from quran.model import SurahDetails
+from quran.service import QuranService
 from starlette import status
 
 router = APIRouter(prefix="/quran", tags=["Quran Services"])

@@ -8,8 +8,7 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 from config import openrouter, pinecone, gemini
-from model.agent import AgentTool
-from model.chat import AgentStep
+from chat.model import AgentStep, AgentTool
 from geopy.geocoders import Nominatim
 from hijri_converter import Hijri, Gregorian
 

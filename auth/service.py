@@ -10,10 +10,10 @@ from sqlmodel import Session, select
 from config import database
 from config.jwt import config as jwt_config
 from config.security import config as security_config
-from entity.auth import RefreshToken, User
-from model.user import TokenData
+from auth.entity import RefreshToken, User
+from auth.model import TokenData
 from starlette import status
-from services.audit import AuditService
+from audit.service import AuditService
 
 # Password Hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

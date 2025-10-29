@@ -5,9 +5,9 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 
 from config import database
-from entity.auth import RefreshToken
-from model.user import SessionInfo, UserResponse
-from services.auth import AuthService
+from auth.entity import RefreshToken
+from auth.model import SessionInfo, UserResponse
+from auth.service import AuthService
 from starlette import status
 
 router = APIRouter(prefix="/user", tags=["User Services"])

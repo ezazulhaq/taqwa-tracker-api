@@ -11,12 +11,12 @@ from starlette import status
 from config import database
 from config.email import config as email_config
 from config.jwt import config as jwt_config
-from entity.auth import RefreshToken, User
-from model.user import EmailVerification, PasswordRecovery, PasswordReset, Token, UserCreate, UserResponse
-from services.audit import AuditService
-from services.auth import AuthService
-from services.email import EmailService
-from services.security import SecurityService
+from auth.entity import RefreshToken, User
+from auth.model import EmailVerification, PasswordRecovery, PasswordReset, Token, UserCreate, UserResponse
+from audit.service import AuditService
+from auth.service import AuthService
+from shared.email import EmailService
+from shared.security import SecurityService
 
 router = APIRouter(prefix="/auth", tags=["Authentication Services"])
 
