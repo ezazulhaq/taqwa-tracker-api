@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, delete, select
 from starlette import status
 
+from auth.entity import User
 from config import database
 from chat.entity import Conversation, Message
 from chat.model import ChatRequest, ChatResponse
@@ -20,7 +21,7 @@ Oauth2Dep = Annotated[str, Depends(OAuth2PasswordBearer(tokenUrl="auth/token"))]
 
 SessionDep = Annotated[Session, Depends(database.get_db_session)]
 
-AuthDep = Annotated[AuthService, Depends()]
+UserDep = Annotated[User, Depends(AuthService.get_current_user)]
 
 ChatDep = Annotated[ChatService, Depends()]
 
@@ -29,16 +30,12 @@ AgentDep = Annotated[AgentService, Depends()]
 @router.post("/agent", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
-    token: Oauth2Dep,
+    current_user: UserDep,
     session: SessionDep,
-    auth: AuthDep,
     agent: AgentDep,
     chat: ChatDep
 ):
     """Main Agentic chat endpoint"""
-    # Get current user from token
-    current_user = await auth.get_current_user(token, session)
-    
     # Create new conversation if not provided or invalid UUID
     if not request.conversation_id:
         conversation_id = chat.create_conversation(user_id=current_user.id, session=session)
@@ -94,15 +91,10 @@ async def chat(
 
 @router.get("/agent/tools")
 async def get_available_tools(
-    token: Oauth2Dep,
-    session: SessionDep,
-    auth: AuthDep,
+    current_user: UserDep,
     agent: AgentDep
 ):
     """Get list of available agent tools"""
-    # Get current user from token
-    await auth.get_current_user(token, session)
-    
     tools_info = {}
     for name, tool in agent.tools.items():
         tools_info[name] = {
@@ -116,15 +108,11 @@ async def get_available_tools(
 @router.get("/conversations/{conversation_id}")
 async def get_conversation(
     conversation_id: str,
-    token: Oauth2Dep,
+    current_user: UserDep,
     session: SessionDep,
-    auth: AuthDep,
     chat: ChatDep
 ):
-    """Get conversation history"""
-    # Get current user from token
-    current_user = await auth.get_current_user(token, session)
-        
+    """Get conversation history"""        
     try:
         statement = select(Conversation).where(Conversation.id == conversation_id and Conversation.user_id == current_user.id)
         # conv_result = supabase.table("conversations").select("*").eq("id", conversation_id).single().execute()
@@ -153,14 +141,10 @@ async def get_conversation(
 
 @router.get("/conversations")
 async def get_user_conversations(
-    token: Oauth2Dep,
-    session: SessionDep,
-    auth: AuthDep
+    current_user: UserDep,
+    session: SessionDep
 ):
     """Get user's conversation list"""
-    # Get current user from token
-    current_user = await auth.get_current_user(token, session)
-    
     try:
         #result = supabase.table("conversations").select("*").eq("user_id", user_id).order("updated_at", desc=True).execute()
         statement = select(Conversation).where(Conversation.user_id == current_user.id).order_by(Conversation.updated_at.desc())
@@ -173,14 +157,10 @@ async def get_user_conversations(
 @router.delete("/conversations/{conversation_id}")
 async def delete_conversation(
     conversation_id: str,
-    token: Oauth2Dep,
-    session: SessionDep,
-    auth: AuthDep
+    current_user: UserDep,
+    session: SessionDep
 ):
     """Delete a conversation"""
-    # Get current user from token
-    current_user = await auth.get_current_user(token, session)
-    
     try:
         #conv_result = supabase.table("conversations").select("user_id").eq("id", conversation_id).single().execute()
         statement=select(Conversation).where(Conversation.id == conversation_id and Conversation.user_id == current_user.id)
