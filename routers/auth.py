@@ -26,6 +26,7 @@ Oauth2Dep = Annotated[str, Depends(oauth2_scheme)]
 
 SessionDep = Annotated[Session, Depends(database.get_db_session)]
 
+UserDep = Annotated[User, Depends(AuthService.get_current_user)]
 SecurityDep = Annotated[SecurityService, Depends()]
 AuthDep = Annotated[AuthService, Depends()]
 AuditDep = Annotated[AuditService, Depends()]
@@ -317,19 +318,15 @@ async def refresh_access_token(
 
 @router.post("/logout")
 async def logout(
-    token: Oauth2Dep,
     refresh_token: Optional[str] = None,
     request: Request = None,
+    current_user: UserDep = None,
     session: SessionDep = None,
-    auth: AuthDep = None,
     audit: AuditDep = None,
 ):
     """
     Logout user and revoke refresh token
-    """
-    # Get current user from token
-    current_user = await auth.get_current_user(token, session)
-    
+    """    
     if refresh_token:
         # Revoke the refresh token
         statement = select(RefreshToken).where(

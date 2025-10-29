@@ -1,6 +1,6 @@
 import jwt
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 
 from datetime import datetime, timedelta, timezone
@@ -12,7 +12,6 @@ from config.jwt import config as jwt_config
 from config.security import config as security_config
 from auth.entity import RefreshToken, User
 from auth.model import TokenData
-from starlette import status
 from audit.service import AuditService
 
 # Password Hashing
@@ -172,14 +171,7 @@ class AuthService:
         user = AuthService.get_user_by_email(session, email=token_data.email)
         if user is None:
             raise credentials_exception
+        if not user.is_active:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
         
         return user
-
-    @staticmethod
-    async def get_current_active_user(
-        current_user: Annotated[User, Depends(get_current_user)]
-    ) -> User:
-        """Ensure user is active"""
-        if not current_user.is_active:
-            raise HTTPException(status_code=400, detail="Inactive user")
-        return current_user
