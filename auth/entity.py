@@ -26,6 +26,7 @@ class User(SQLModel, table=True):
     preferred_madhab: Optional[str] = None
     language: Optional[str] = Field(default="en")
     preferences: Optional[Dict[str, Any]] = Field(default_factory=dict, sa_column=Column(JSON))
+    role: Optional[str] = Field(default="user")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

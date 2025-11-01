@@ -22,6 +22,10 @@ ADD COLUMN preferred_madhab TEXT,
 ADD COLUMN language TEXT DEFAULT 'en',
 ADD COLUMN preferences JSONB DEFAULT '{}';
 
+-- Add role column to the users table
+ALTER TABLE users 
+ADD COLUMN role VARCHAR DEFAULT 'user';
+
 -- Create index on email for faster lookups
 CREATE INDEX idx_users_email ON users(email);
 
