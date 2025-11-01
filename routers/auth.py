@@ -79,7 +79,7 @@ async def signup(
     
     # Create verification token (valid for 24 hours)
     verification_token = auth.create_access_token(
-        data={"sub": user_data.email, "type": "email_verification"},
+        data={"sub": user_data.email, "type": "email_verification", "role": user_data.role},
         expires_delta=timedelta(hours=24)
     )
     
@@ -168,7 +168,7 @@ async def login(
     # Create tokens
     access_token_expires = timedelta(minutes=jwt_config.access_token_expire_minutes)
     access_token = auth.create_access_token(
-        data={"sub": user.email},
+        data={"sub": user.email, "role": user.role},
         expires_delta=access_token_expires
     )
     
@@ -238,7 +238,7 @@ async def login_json(
     # Create tokens
     access_token_expires = timedelta(minutes=jwt_config.access_token_expire_minutes)
     access_token = auth.create_access_token(
-        data={"sub": user.email},
+        data={"sub": user.email, "role": user.role},
         expires_delta=access_token_expires
     )
     
@@ -302,7 +302,7 @@ async def refresh_access_token(
         # Create new access token
         access_token_expires = timedelta(minutes=jwt_config.access_token_expire_minutes)
         access_token = auth.create_access_token(
-            data={"sub": user.email},
+            data={"sub": user.email, "role": user.role},
             expires_delta=access_token_expires
         )
         
@@ -431,7 +431,7 @@ async def resend_verification(
     
     # Create new verification token
     verification_token = auth.create_access_token(
-        data={"sub": user.email, "type": "email_verification"},
+        data={"sub": user.email, "type": "email_verification", "role": user.role},
         expires_delta=timedelta(hours=24)
     )
     
@@ -470,7 +470,7 @@ async def recover_password(
     if user:
         # Create password reset token (valid for 1 hour)
         reset_token = auth.create_access_token(
-            data={"sub": user.email, "type": "password_reset"},
+            data={"sub": user.email, "type": "password_reset", "role": user.role},
             expires_delta=timedelta(hours=1)
         )
         
