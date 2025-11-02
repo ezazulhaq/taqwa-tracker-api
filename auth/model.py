@@ -27,6 +27,11 @@ class UserResponse(BaseModel):
     is_verified: bool
     role: Optional[str]
     created_at: datetime
+    
+class UserAdminResponse(UserResponse):
+    failed_login_attempts: int
+    locked_until: Optional[datetime]
+    last_login: Optional[datetime]
 
 class PasswordRecovery(BaseModel):
     email: EmailStr
