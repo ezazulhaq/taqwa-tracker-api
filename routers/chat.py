@@ -16,12 +16,10 @@ from chat.service import ChatService
 
 router = APIRouter(prefix="/chat", tags=["Chatbot Services"])
 
-# OAuth2
-Oauth2Dep = Annotated[str, Depends(OAuth2PasswordBearer(tokenUrl="auth/token"))]
-
 SessionDep = Annotated[Session, Depends(database.get_db_session)]
 
-UserDep = Annotated[User, Depends(AuthService.get_current_user)]
+user_dep = Depends(AuthService.get_current_user)
+UserDep = Annotated[User, user_dep]
 
 ChatDep = Annotated[ChatService, Depends()]
 
@@ -89,9 +87,8 @@ async def chat(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process agent request")
 
 
-@router.get("/agent/tools")
+@router.get("/agent/tools", dependencies=[user_dep])
 async def get_available_tools(
-    current_user: UserDep,
     agent: AgentDep
 ):
     """Get list of available agent tools"""
