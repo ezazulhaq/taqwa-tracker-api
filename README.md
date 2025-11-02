@@ -13,6 +13,8 @@ A comprehensive FastAPI microservice for Islamic guidance and Quranic data acces
 - **PostgreSQL Integration**: Robust database with SQLModel ORM
 - **Vector Search**: Pinecone integration for semantic Islamic knowledge search
 - **Multi-LLM Support**: OpenRouter and Google Gemini integration
+- **Comprehensive Audit System**: Security logging and user activity tracking
+- **Email Services**: User verification and notification system
 
 ## Project Structure
 
@@ -24,14 +26,12 @@ taqwa-tracker-api/
 │   ├── gemini.py           # Google Gemini AI configuration
 │   ├── jwt.py              # JWT authentication configuration
 │   ├── openrouter.py       # OpenRouter LLM configuration
-│   └── pinecone.py         # Pinecone vector DB configuration
-├── agent/                   # AI Agent Domain
-│   ├── entity.py           # Agent execution entities
-│   ├── model.py            # Agent response models
-│   └── service.py          # AI agent business logic
+│   ├── pinecone.py         # Pinecone vector DB configuration
+│   └── security.py         # Security configuration
 ├── audit/                   # Audit & Logging Domain
 │   ├── entity.py           # Audit log entities
-│   └── model.py            # Audit response models
+│   ├── model.py            # Audit response models
+│   └── service.py          # Audit logging service
 ├── auth/                    # Authentication Domain
 │   ├── entity.py           # User and token entities
 │   ├── model.py            # Auth request/response models
@@ -44,24 +44,21 @@ taqwa-tracker-api/
 │   ├── entity.py           # Surah and ayah entities
 │   ├── model.py            # Quran response models
 │   └── service.py          # Quranic data service
-├── user/                    # User Profile Domain
-│   ├── entity.py           # User profile entities
-│   ├── model.py            # User profile models
-│   └── service.py          # User management service
 ├── routers/                 # API Route Handlers
-│   ├── agent.py            # Agent endpoints
 │   ├── audit.py            # Audit endpoints
 │   ├── auth.py             # Authentication endpoints
 │   ├── chat.py             # Chat endpoints
 │   ├── quran.py            # Quran endpoints
 │   ├── status.py           # Health check endpoints
 │   └── user.py             # User profile endpoints
-├── services/                # Shared Services
-│   ├── audit.py            # Audit logging service
+├── shared/                  # Shared Services
+│   ├── agent.py            # AI agent service
 │   ├── email.py            # Email service
 │   └── security.py         # Security utilities
-├── scripts/                 # Database Scripts
-│   └── auth.sql            # Authentication tables
+├── db/                      # Database Scripts
+│   ├── audit.sql           # Audit tables
+│   ├── auth.sql            # Authentication tables
+│   └── chat.sql            # Chat tables
 ├── main.py                 # FastAPI application
 ├── requirements.txt        # Dependencies
 ├── pyproject.toml          # Project configuration
@@ -134,6 +131,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `POST /auth/refresh` - Refresh access token
 - `POST /auth/logout` - Logout and revoke tokens
 - `POST /auth/verify-email` - Verify email with token
+- `POST /auth/resend-verification` - Resend verification email
 - `POST /auth/recover` - Password recovery
 - `POST /auth/reset-password` - Reset password with token
 
@@ -149,7 +147,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
   - **Response**: List of ayah details with Arabic text and translations
 
 ### AI Chat Agent
-- `POST /chat` - Main conversational AI endpoint
+- `POST /chat/agent` - Main conversational AI endpoint
   - **Request Body**:
     ```json
     {
@@ -169,9 +167,14 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
       "tools_used": ["list of tools"]
     }
     ```
+- `GET /chat/agent/tools` - Get available agent tools
+- `GET /chat/conversations` - Get user's conversation list
+- `GET /chat/conversations/{conversation_id}` - Get conversation history
+- `DELETE /chat/conversations/{conversation_id}` - Delete a conversation
 
 ### Audit & Monitoring
-- `GET /audit/audit-logs` - Get user audit logs (authenticated)
+- `GET /audit/audit-logs` - Get all audit logs (admin only)
+  - **Query Parameters**: `limit`, `email`, `event_type`
 
 ## AI Agent Capabilities
 
@@ -264,12 +267,21 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 - **openai** - OpenAI API client (via OpenRouter)
 - **google-generativeai** - Google Gemini AI integration
 
+### Authentication & Security
+- **PyJWT** - JWT token handling
+- **bcrypt** - Password hashing
+- **passlib** - Password utilities
+- **python-jose** - JWT cryptography
+- **python-multipart** - Form data handling
+
 ### Utilities
 - **python-dotenv** - Environment variable management
 - **requests** - HTTP client for external APIs
+- **httpx** - Async HTTP client
 - **geopy** - Geocoding and location services
 - **pytz** - Timezone handling
 - **hijri-converter** - Islamic calendar conversions
+- **pydantic[email]** - Email validation
 
 ## Usage Examples
 
@@ -296,7 +308,7 @@ curl -X POST "http://localhost:8000/auth/login" \
 
 ### Basic Islamic Question
 ```bash
-curl -X POST "http://localhost:8000/chat" \
+curl -X POST "http://localhost:8000/chat/agent" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -d '{
@@ -306,7 +318,7 @@ curl -X POST "http://localhost:8000/chat" \
 
 ### Prayer Times Request
 ```bash
-curl -X POST "http://localhost:8000/chat" \
+curl -X POST "http://localhost:8000/chat/agent" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -d '{
