@@ -8,6 +8,7 @@ from config import database
 from audit.entity import AuditLog
 from audit.model import AuditLogsResponse
 from auth.service import AuthService
+from pydantic import EmailStr
 
 router = APIRouter(prefix="/audit", tags=["Audit Services"])
 
@@ -16,20 +17,23 @@ Oauth2Dep = Annotated[str, Depends(OAuth2PasswordBearer(tokenUrl="auth/token"))]
 
 SessionDep = Annotated[Session, Depends(database.get_db_session)]
 
-UserDep = Annotated[User, Depends(AuthService.get_current_user)]
+AdminDep = Annotated[User, Depends(AuthService.get_admin_user)]
 
 @router.get("/audit-logs", response_model=List[AuditLogsResponse])
 async def get_all_audit_logs(
-    current_user: UserDep,
+    admin_user: AdminDep,
     session: SessionDep,
     limit: int = 100,
+    email: Optional[EmailStr] = None,
     event_type: Optional[str] = None,
 ):
     """
-    Get all audit logs (admin only - add authentication!)
+    Get all audit logs (admin only)
     """
-    statement = select(AuditLog).where(AuditLog.user_id == current_user.id).order_by(AuditLog.created_at.desc())
+    statement = select(AuditLog).order_by(AuditLog.created_at.desc())
     
+    if email:
+        statement = statement.where(AuditLog.email == email)
     if event_type:
         statement = statement.where(AuditLog.event_type == event_type)
     

@@ -31,6 +31,6 @@ class JWTConfig:
 config = JWTConfig(
     secret_key=os.getenv("JWT_SECRET_KEY"),
     algorithm=os.getenv("JWT_ALGORITHM"),
-    access_token_expire_minutes=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES")),
-    refresh_token_expire_days=int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS"))
+    access_token_expire_minutes=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30")),
+    refresh_token_expire_days=int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 )

@@ -17,6 +17,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     full_name: Optional[str] = None
+    role: Optional[str] = "user"
 
 class UserResponse(BaseModel):
     id: UUID
@@ -24,6 +25,7 @@ class UserResponse(BaseModel):
     full_name: Optional[str]
     is_active: bool
     is_verified: bool
+    role: Optional[str]
     created_at: datetime
 
 class PasswordRecovery(BaseModel):
