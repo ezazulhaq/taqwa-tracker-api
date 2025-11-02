@@ -1,10 +1,9 @@
 import logging
 import uuid
 from typing import Annotated, Optional
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, delete, select
-from starlette import status
 
 from auth.entity import User
 from config import database
@@ -15,9 +14,6 @@ from auth.service import AuthService
 from chat.service import ChatService
 
 router = APIRouter(prefix="/chat", tags=["Chatbot Services"])
-
-# OAuth2
-Oauth2Dep = Annotated[str, Depends(OAuth2PasswordBearer(tokenUrl="auth/token"))]
 
 SessionDep = Annotated[Session, Depends(database.get_db_session)]
 

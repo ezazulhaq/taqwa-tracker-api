@@ -9,8 +9,7 @@ class SecurityService:
     # Simple in-memory rate limiting (use Redis in production)
     rate_limit_store = defaultdict(list)
 
-    @staticmethod
-    def check_rate_limit(identifier: str, max_requests: int = security_config.rate_limit_requests) -> bool:
+    def check_rate_limit(self, identifier: str, max_requests: int = security_config.rate_limit_requests) -> bool:
         """
         Check if request exceeds rate limit
         """
@@ -18,21 +17,20 @@ class SecurityService:
         minute_ago = now - timedelta(minutes=1)
         
         # Clean old entries
-        SecurityService.rate_limit_store[identifier] = [
-            timestamp for timestamp in SecurityService.rate_limit_store[identifier]
+        self.rate_limit_store[identifier] = [
+            timestamp for timestamp in self.rate_limit_store[identifier]
             if timestamp > minute_ago
         ]
         
         # Check limit
-        if len(SecurityService.rate_limit_store[identifier]) >= max_requests:
+        if len(self.rate_limit_store[identifier]) >= max_requests:
             return False
         
         # Add current request
-        SecurityService.rate_limit_store[identifier].append(now)
+        self.rate_limit_store[identifier].append(now)
         return True
 
-    @staticmethod
-    def rate_limit(max_requests: int = security_config.rate_limit_requests):
+    def rate_limit(self, max_requests: int = security_config.rate_limit_requests):
         """
         Decorator for rate limiting endpoints
         """
@@ -42,7 +40,7 @@ class SecurityService:
                 request: Request = kwargs.get('request')
                 if request:
                     client_ip = request.client.host
-                    if not SecurityService.check_rate_limit(client_ip, max_requests):
+                    if not self.check_rate_limit(client_ip, max_requests):
                         raise HTTPException(
                             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                             detail="Too many requests. Please try again later."
