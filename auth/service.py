@@ -174,6 +174,11 @@ class AuthService:
             raise credentials_exception
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
+        if user.role not in ["admin", "dev"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access forbidden. Admin or Dev role required."
+            )
         
         return user
 
