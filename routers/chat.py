@@ -1,10 +1,9 @@
 import logging
 import uuid
 from typing import Annotated, Optional
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, delete, select
-from starlette import status
 
 from auth.entity import User
 from config import database

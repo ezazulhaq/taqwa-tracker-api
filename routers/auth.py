@@ -20,10 +20,6 @@ from shared.security import SecurityService
 
 router = APIRouter(prefix="/auth", tags=["Authentication Services"])
 
-# OAuth2
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
-Oauth2Dep = Annotated[str, Depends(oauth2_scheme)]
-
 SessionDep = Annotated[Session, Depends(database.get_db_session)]
 
 UserDep = Annotated[User, Depends(AuthService.get_current_user)]
