@@ -115,6 +115,8 @@ def get_surah_info(
     }
 )
 def get_ayahs_by_surah(
+    session: SessionDep,
+    quran: QuranDep,
     surah_no: Annotated[
         int, 
         Query(
@@ -124,12 +126,18 @@ def get_ayahs_by_surah(
             description="The number of the Surah (1-114). Examples: 1 for Al-Fatihah, 2 for Al-Baqarah, 114 for An-Nas",
             example=1
         )
-    ], 
-    session: SessionDep,
-    quran: QuranDep
+    ],
+    translator: Annotated[
+        str,
+        Query(
+            title="Translator Name",
+            description="Name of the translator for the Quranic translation",
+            example="Ahmed Raza"
+        )
+    ] = "Ahmed Raza"
     ):
     try:
-        ayahDetails: list[AyahDetails] = quran.get_ayahs(surah_no, session)
+        ayahDetails: list[AyahDetails] = quran.get_ayahs(surah_no, translator, session)
         if not ayahDetails:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ayahs not found")
         

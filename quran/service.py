@@ -10,7 +10,7 @@ class QuranService:
         results = session.exec(statement).all()
         return results
     
-    def get_ayahs(self, surah_no: int, session: Session) -> List[AyahDetails]:
-        statement = select(VSurahDetails).where(VSurahDetails.translator_name == 'Ahmed Raza').where(VSurahDetails.surah_no == surah_no)
+    def get_ayahs(self, surah_no: int, translator:str, session: Session) -> List[AyahDetails]:
+        statement = select(VSurahDetails).where(VSurahDetails.translator_name == translator).where(VSurahDetails.surah_no == surah_no)
         results = session.exec(statement).all()
         return results
