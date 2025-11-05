@@ -20,6 +20,7 @@ env/
 .idea/
 *.swp
 *.swo
+.idx/
 
 # OS
 .DS_Store
