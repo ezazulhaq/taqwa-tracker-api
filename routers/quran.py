@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
 from config.database import get_db_session
@@ -75,7 +75,7 @@ def get_surah_info(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching surahs")
 
 @router.get(
-    "/surahs/{surah_no}",
+    "/ayahs",
     status_code=status.HTTP_200_OK,
     response_model=list[AyahDetails],
     summary="Get Ayahs by Surah Number",
@@ -117,7 +117,7 @@ def get_surah_info(
 def get_ayahs_by_surah(
     surah_no: Annotated[
         int, 
-        Path(
+        Query(
             ge=1, 
             le=114, 
             title="Surah Number", 
