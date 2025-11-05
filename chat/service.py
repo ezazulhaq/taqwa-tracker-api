@@ -13,7 +13,10 @@ from chat.entity import Conversation, Message
 class ChatService:
     
     def create_conversation(self, user_id: Optional[str] = None, session: Session = None) -> str:
-        """Create a new conversation in Supabase"""
+        """Create a new conversation"""
+        if not session:
+            raise ValueError("Database session is required")
+            
         try:
             conversation_id = str(uuid.uuid4())
             conversation_data = {
@@ -29,11 +32,17 @@ class ChatService:
             
             return conversation_id
         except Exception as e:
-            logging.error(f"Error creating conversation: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to create conversation")
+            session.rollback()
+            logging.error(f"Error creating conversation for user {user_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to create conversation")
 
     def save_message(self, conversation_id: str, role: str, content: str, metadata: Dict = None, session: Session = None) -> str:
-        """Save a message to Supabase with optional metadata"""
+        """Save a message with optional metadata"""
+        if not session:
+            raise ValueError("Database session is required")
+        if not conversation_id or not role or not content:
+            raise ValueError("conversation_id, role, and content are required")
+            
         try:
             message_id = str(uuid.uuid4())
             message_data = {
@@ -58,17 +67,25 @@ class ChatService:
             
             return message_id
         except Exception as e:
-            logging.error(f"Error saving message: {e}")
+            session.rollback()
+            logging.error(f"Error saving message for conversation {conversation_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to save message")
 
     def get_conversation_history(self, conversation_id: str, user_id: Optional[str] = None, session: Session = None) -> List[Message]:
-        """Get conversation history from Supabase"""
+        """Get conversation history"""
+        if not session:
+            raise ValueError("Database session is required")
+        if not conversation_id:
+            raise ValueError("conversation_id is required")
+            
         try:
             # If user is authenticated, verify they own the conversation
             if user_id:
-                conv_stmt = select(Conversation).where(Conversation.id == conversation_id).where(Conversation.user_id == user_id)
+                conv_stmt = select(Conversation).where(
+                    (Conversation.id == conversation_id) & (Conversation.user_id == user_id)
+                )
                 conv_result = session.exec(conv_stmt).first()
-                if not conv_result: # or conv_result.user_id != user_id:
+                if not conv_result:
                     raise HTTPException(status_code=403, detail="Access denied to conversation")
             
             statement = select(Message).where(Message.conversation_id == conversation_id).order_by(Message.created_at)            
@@ -77,5 +94,5 @@ class ChatService:
         except HTTPException:
             raise
         except Exception as e:
-            logging.error(f"Error getting conversation history: {e}")
+            logging.error(f"Error getting conversation history for {conversation_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to retrieve conversation history")

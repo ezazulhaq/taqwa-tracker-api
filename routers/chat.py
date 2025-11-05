@@ -81,8 +81,12 @@ async def chat(
             tools_used=agent_result["tools_used"]
         )
         
+    except HTTPException:
+        session.rollback()
+        raise
     except Exception as e:
-        logging.error(f"Error in agent chat endpoint: {e}")
+        session.rollback()
+        logging.error(f"Error in agent chat endpoint: {e}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process agent request")
 
 
@@ -110,15 +114,19 @@ async def get_conversation(
 ):
     """Get conversation history"""        
     try:
-        statement = select(Conversation).where(Conversation.id == conversation_id and Conversation.user_id == current_user.id)
-        # conv_result = supabase.table("conversations").select("*").eq("id", conversation_id).single().execute()
+        # Validate UUID format
+        try:
+            uuid.UUID(conversation_id)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid conversation ID format")
+            
+        statement = select(Conversation).where(
+            (Conversation.id == conversation_id) & (Conversation.user_id == current_user.id)
+        )
         conversation = session.exec(statement).first()
         
-        if not conversation.id:
+        if not conversation:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
-                
-        #if current_user.id and conversation["user_id"] and conversation["user_id"] != current_user.id:
-        #    raise HTTPException(status_code=403, detail="Access denied to conversation")
         
         messages = chat.get_conversation_history(conversation_id, current_user.id, session)
         
@@ -132,8 +140,8 @@ async def get_conversation(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting conversation: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve conversation")
+        logging.error(f"Error getting conversation {conversation_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve conversation")
 
 @router.get("/conversations")
 async def get_user_conversations(
@@ -142,13 +150,12 @@ async def get_user_conversations(
 ):
     """Get user's conversation list"""
     try:
-        #result = supabase.table("conversations").select("*").eq("user_id", user_id).order("updated_at", desc=True).execute()
         statement = select(Conversation).where(Conversation.user_id == current_user.id).order_by(Conversation.updated_at.desc())
         result = session.exec(statement).all()
         return {"conversations": result}
     except Exception as e:
-        print(f"Error getting user conversations: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve conversations")
+        logging.error(f"Error getting user conversations for user {current_user.id}: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve conversations")
 
 @router.delete("/conversations/{conversation_id}")
 async def delete_conversation(
@@ -158,23 +165,32 @@ async def delete_conversation(
 ):
     """Delete a conversation"""
     try:
-        #conv_result = supabase.table("conversations").select("user_id").eq("id", conversation_id).single().execute()
-        statement=select(Conversation).where(Conversation.id == conversation_id and Conversation.user_id == current_user.id)
+        # Validate UUID format
+        try:
+            uuid.UUID(conversation_id)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid conversation ID format")
+            
+        statement = select(Conversation).where(
+            (Conversation.id == conversation_id) & (Conversation.user_id == current_user.id)
+        )
         conv_result = session.exec(statement).first()
         
         if not conv_result:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
         
-        #supabase.table("messages").delete().eq("conversation_id", conversation_id).execute()
+        # Delete messages first (foreign key constraint)
         session.exec(delete(Message).where(Message.conversation_id == conversation_id))
-        #supabase.table("conversations").delete().eq("id", conversation_id).execute()
+        # Delete conversation
         session.exec(delete(Conversation).where(Conversation.id == conversation_id))
         session.commit()
         
         return {"message": "Conversation deleted successfully"}
         
     except HTTPException:
+        session.rollback()
         raise
     except Exception as e:
-        print(f"Error deleting conversation: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete conversation")
+        session.rollback()
+        logging.error(f"Error deleting conversation {conversation_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete conversation")

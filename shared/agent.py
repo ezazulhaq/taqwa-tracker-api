@@ -1,7 +1,11 @@
 import json
+import logging
 import os
 import math
 import requests
+import re
+import html
+import asyncio
 
 from typing import Any, Dict, List
 from datetime import datetime
@@ -138,7 +142,7 @@ class AgentService:
                     )
                 )
             except Exception as e:
-                print(f"Error executing step {step_num}: {e}")
+                logging.error(f"Error executing step {step_num}: {e}", exc_info=True)
                 continue
         
         # Step 3: Synthesize final response
@@ -251,13 +255,13 @@ class AgentService:
                     }
                 ],
                 max_tokens=800,
-                temperature=0.3
+                temperature=0.3,
+                timeout=30
             )
             
             plan_text = response.choices[0].message.content
             
             # Extract JSON from response
-            import re
             json_match = re.search(r'\{.*\}', plan_text, re.DOTALL)
             if json_match:
                 plan = json.loads(json_match.group())
@@ -289,42 +293,55 @@ class AgentService:
                     }
                 
         except Exception as e:
-            print(f"Error in planning: {e}")
-            # Better fallback logic
-            islamic_keywords = ["islam", "quran", "hadith", "prayer", "salah", "dua", "allah", "prophet", "muhammad", "mosque", "halal", "haram"]
-            if any(keyword in user_message.lower() for keyword in islamic_keywords):
-                return {
-                    "intent": "Islamic inquiry",
-                    "complexity": "simple",
-                    "steps": [{
-                        "action": "Search Islamic knowledge",
-                        "tool": "search_islamic_knowledge",
-                        "reasoning": "Islamic-related query",
-                        "parameters": {"query": user_message}
-                    }]
-                }
-            else:
-                return {
-                    "intent": "Non-Islamic query",
-                    "complexity": "simple",
-                    "steps": [{
-                        "action": "Restrict non-Islamic query",
-                        "tool": "restrict_query",
-                        "reasoning": "Query is not related to Islamic topics",
-                        "parameters": {"message": user_message}
-                    }]
-                }
+            logging.error(f"Error in planning: {e}", exc_info=True)
+            return self._get_fallback_plan(user_message)
+    
+    def _get_fallback_plan(self, user_message: str) -> Dict:
+        """Generate fallback plan when AI planning fails"""
+        islamic_keywords = ["islam", "quran", "hadith", "prayer", "salah", "dua", "allah", "prophet", "muhammad", "mosque", "halal", "haram"]
+        if any(keyword in user_message.lower() for keyword in islamic_keywords):
+            return {
+                "intent": "Islamic inquiry",
+                "complexity": "simple",
+                "steps": [{
+                    "action": "Search Islamic knowledge",
+                    "tool": "search_islamic_knowledge",
+                    "reasoning": "Islamic-related query",
+                    "parameters": {"query": user_message}
+                }]
+            }
+        else:
+            return {
+                "intent": "Non-Islamic query",
+                "complexity": "simple",
+                "steps": [{
+                    "action": "Restrict non-Islamic query",
+                    "tool": "restrict_query",
+                    "reasoning": "Query is not related to Islamic topics",
+                    "parameters": {"message": user_message}
+                }]
+            }
     
     async def execute_step(self, step_num: int, step: Dict) -> Any:
         """Execute a single step in the plan"""
+        if not isinstance(step, dict) or "tool" not in step:
+            logging.error(f"Invalid step format at step {step_num}: {step}")
+            return "Invalid step configuration"
+            
         tool_name = step["tool"]
         parameters = step.get("parameters", {})
         
-        if tool_name in self.tools:
+        if tool_name not in self.tools:
+            logging.error(f"Tool {tool_name} not found at step {step_num}")
+            return f"Tool {tool_name} not available"
+            
+        try:
             tool = self.tools[tool_name]
-            return await tool.function(**parameters)
-        else:
-            return f"Tool {tool_name} not found"
+            result = await tool.function(**parameters)
+            return result
+        except Exception as e:
+            logging.error(f"Error executing step {step_num} with tool {tool_name}: {e}", exc_info=True)
+            return f"Error executing {tool_name}: {str(e)}"
     
     async def synthesize_response(self, user_message: str, results: List, plan: Dict) -> str:
         """Synthesize final response from all step results"""
@@ -369,7 +386,7 @@ class AgentService:
             )
             return response.choices[0].message.content
         except Exception as e:
-            print(f"Error in synthesis: {e}")
+            logging.error(f"Error in synthesis: {e}", exc_info=True)
             return "I apologize, but I encountered an issue generating a response. Please try again."
     
     # Tool implementation methods
@@ -394,46 +411,58 @@ class AgentService:
     
     async def search_islamic_knowledge(self, query: str, source_name: str = "all") -> str:
         """Search Islamic knowledge in Pinecone"""
-        try:
-            stats = pinecone.index.describe_index_stats()
-            if stats.total_vector_count == 0:
-                return "Index is empty"
+        if not query or not query.strip():
+            return "Search query is required"
             
-            query_embedding = self.generate_embedding(query)
+        try:
+            # Check index status first
+            try:
+                stats = await asyncio.wait_for(
+                    asyncio.to_thread(pinecone.index.describe_index_stats), 
+                    timeout=10
+                )
+            except asyncio.TimeoutError:
+                logging.error(f"Failed to check index stats: {e}")
+                return "Knowledge base is temporarily unavailable"
+            
+            query_embedding = self.generate_embedding(query.strip())
             if not query_embedding:
-                return "Embedding failed"
+                return "Failed to process search query"
             
             search_results = pinecone.index.query(
                 vector=query_embedding,
-                top_k=5,
+                top_k=3,  # Reduced for better performance
                 include_metadata=True,
                 namespace="sahih_bukhari"
             )
             
             if not search_results.matches:
-                return "No matches found"
+                return "No relevant Islamic knowledge found for your query"
             
-            results = []
-            for match in search_results.matches:
-                results.append({
-                    "content": match.metadata.get("text", ""),
-                    "source": match.metadata.get("source_name", ""),
-                    "hadith_no": match.metadata.get("hadith_no", ""),
-                    "score": match.score
-                })
-            
+            # Process results more efficiently
             formatted_results = []
-            for r in results:
-                formatted_results.append(f"Score: {r['score']:.3f}\nSource: {r['source']}\nContent: {r['content']}")
+            for match in search_results.matches:
+                content = match.metadata.get("text", "")
+                source = match.metadata.get(source_name, "Unknown")
+                # Truncate long content for better readability
+                if len(content) > 300:
+                    content = content[:300] + "..."
+                formatted_results.append(f"Source: {source}\nContent: {content}")
             
-            return f"Found {len(results)} results:\n" + "\n\n".join(formatted_results)
+            return f"Found {len(formatted_results)} results:\n\n" + "\n\n".join(formatted_results)
                 
         except Exception as e:
-            return f"Error: {str(e)}"
+            logging.error(f"Error searching Islamic knowledge: {e}", exc_info=True)
+            return "Unable to search knowledge base at this time"
     
     async def get_prayer_times(self, location: str, date: str = None, method: int = 2) -> str:
         """Get prayer times using Aladhan API"""
+        if not location or not location.strip():
+            return "Location is required for prayer times"
+            
         try:
+            safe_location = html.escape(location.strip())
+            
             if not date:
                 date = datetime.now().strftime("%Y-%m-%d")
             
@@ -442,7 +471,7 @@ class AgentService:
             location_data = geolocator.geocode(location)
             
             if not location_data:
-                return f"Could not find location: {location}"
+                return f"Could not find location: {safe_location}"
             
             lat, lng = location_data.latitude, location_data.longitude
             
@@ -454,13 +483,13 @@ class AgentService:
                 "method": method
             }
             
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, timeout=10)
             if response.status_code == 200:
                 data = response.json()
+                if "data" not in data or "timings" not in data["data"]:
+                    return "Invalid response from prayer times service"
+                    
                 timings = data["data"]["timings"]
-                
-                # Sanitize location input to prevent XSS
-                safe_location = location.replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#x27;')
                 prayer_times = f"Prayer times for {safe_location} on {date}:\n"
                 prayer_times += f"Fajr: {timings['Fajr']}\n"
                 prayer_times += f"Dhuhr: {timings['Dhuhr']}\n"
@@ -472,17 +501,26 @@ class AgentService:
             else:
                 return "Unable to fetch prayer times at this time"
                 
+        except requests.RequestException as e:
+            logging.error(f"Network error getting prayer times: {e}")
+            return "Unable to fetch prayer times due to network issues"
         except Exception as e:
-            return f"Error getting prayer times: {str(e)}"
+            logging.error(f"Error getting prayer times: {e}", exc_info=True)
+            return "Unable to fetch prayer times at this time"
     
     async def get_qibla_direction(self, location: str) -> str:
         """Calculate Qibla direction"""
+        if not location or not location.strip():
+            return "Location is required for Qibla calculation"
+            
         try:
+            safe_location = html.escape(location.strip())
+            
             geolocator = Nominatim(user_agent="islamic-agent")
             location_data = geolocator.geocode(location)
             
             if not location_data:
-                return f"Could not find location: {location}"
+                return f"Could not find location: {safe_location}"
             
             lat, lng = location_data.latitude, location_data.longitude
             
@@ -502,31 +540,40 @@ class AgentService:
             bearing = math.degrees(bearing)
             bearing = (bearing + 360) % 360
             
-            return f"Qibla direction from {location}: {bearing:.1f}° from North"
+            return f"Qibla direction from {safe_location}: {bearing:.1f}° from North"
             
         except Exception as e:
             return f"Error calculating Qibla direction: {str(e)}"
     
     async def convert_islamic_date(self, date: str, from_calendar: str, to_calendar: str) -> str:
         """Convert between Gregorian and Islamic dates"""
+        if not date or not from_calendar or not to_calendar:
+            return "Date and calendar types are required"
+            
         try:
+            safe_date = html.escape(date.strip())
+            
             if from_calendar == "gregorian" and to_calendar == "hijri":
                 # Parse Gregorian date
                 date_parts = date.split("-")
+                if len(date_parts) != 3:
+                    return "Invalid date format. Use YYYY-MM-DD"
                 year, month, day = int(date_parts[0]), int(date_parts[1]), int(date_parts[2])
                 
                 # Convert to Hijri
                 hijri_date = Gregorian(year, month, day).to_hijri()
-                return f"Gregorian date {date} corresponds to Hijri date: {hijri_date.day}/{hijri_date.month}/{hijri_date.year}"
+                return f"Gregorian date {safe_date} corresponds to Hijri date: {hijri_date.day}/{hijri_date.month}/{hijri_date.year}"
                 
             elif from_calendar == "hijri" and to_calendar == "gregorian":
                 # Parse Hijri date
                 date_parts = date.split("-") if "-" in date else date.split("/")
+                if len(date_parts) != 3:
+                    return "Invalid date format. Use YYYY-MM-DD or YYYY/MM/DD"
                 year, month, day = int(date_parts[0]), int(date_parts[1]), int(date_parts[2])
                 
                 # Convert to Gregorian
                 gregorian_date = Hijri(year, month, day).to_gregorian()
-                return f"Hijri date {date} corresponds to Gregorian date: {gregorian_date.day}/{gregorian_date.month}/{gregorian_date.year}"
+                return f"Hijri date {safe_date} corresponds to Gregorian date: {gregorian_date.day}/{gregorian_date.month}/{gregorian_date.year}"
             else:
                 return "Invalid calendar conversion requested"
                 
@@ -535,7 +582,12 @@ class AgentService:
     
     async def find_halal_places(self, location: str, place_type: str = "all", radius: int = 10) -> str:
         """Find halal places using mock data (implement with real API)"""
+        if not location or not location.strip():
+            return "Location is required to find halal places"
+            
         try:
+            safe_location = html.escape(location.strip())
+            
             # This is a mock implementation - in production, integrate with:
             # - Zomato API for halal restaurants
             # - Google Places API for mosques
@@ -543,16 +595,16 @@ class AgentService:
             
             results = {
                 "restaurant": [
-                    f"Halal Restaurant 1 in {location}",
-                    f"Halal Restaurant 2 in {location}",
+                    f"Halal Restaurant 1 in {safe_location}",
+                    f"Halal Restaurant 2 in {safe_location}",
                 ],
                 "mosque": [
-                    f"Central Mosque of {location}",
-                    f"Community Islamic Center in {location}",
+                    f"Central Mosque of {safe_location}",
+                    f"Community Islamic Center in {safe_location}",
                 ],
                 "islamic_center": [
-                    f"Islamic Cultural Center in {location}",
-                    f"Muslim Community Center in {location}",
+                    f"Islamic Cultural Center in {safe_location}",
+                    f"Muslim Community Center in {safe_location}",
                 ]
             }
             
@@ -560,28 +612,35 @@ class AgentService:
                 all_places = []
                 for places in results.values():
                     all_places.extend(places)
-                return f"Found halal places near {location}:\n" + "\n".join(all_places)
+                return f"Found halal places near {safe_location}:\n" + "\n".join(all_places)
             else:
                 places = results.get(place_type, [])
-                return f"Found {place_type}s near {location}:\n" + "\n".join(places)
+                return f"Found {place_type}s near {safe_location}:\n" + "\n".join(places)
                 
         except Exception as e:
             return f"Error finding halal places: {str(e)}"
     
     async def get_islamic_guidance(self, topic: str, situation: str, madhab: str = "general") -> str:
         """Get specific Islamic guidance"""
+        if not topic or not situation:
+            return "Topic and situation are required for Islamic guidance"
+            
         try:
+            safe_topic = html.escape(topic.strip())
+            safe_situation = html.escape(situation.strip())
+            safe_madhab = html.escape(madhab.strip())
+            
             # Search for relevant guidance in knowledge base
-            guidance_query = f"{topic} {situation} Islamic ruling guidance {madhab}"
+            guidance_query = f"{safe_topic} {safe_situation} Islamic ruling guidance {safe_madhab}"
             knowledge_result = await self.search_islamic_knowledge(guidance_query)
             
             # Generate contextual guidance
             guidance_prompt = f"""
                 Provide Islamic guidance on the following:
 
-                Topic: {topic}
-                Situation: {situation}
-                Madhab preference: {madhab}
+                Topic: {safe_topic}
+                Situation: {safe_situation}
+                Madhab preference: {safe_madhab}
 
                 Relevant Islamic sources found:
                 {knowledge_result}
@@ -610,13 +669,20 @@ class AgentService:
     
     def generate_embedding(self, text: str) -> List[float]:
         """Generate embedding for text using Gemini"""
+        if not text or not text.strip():
+            logging.warning("Empty text provided for embedding generation")
+            return []
+            
         try:            
             result = gemini.genai_client.embed_content(
                 model="models/text-embedding-004",
                 content=text,
                 task_type="retrieval_document"
             )
+            if 'embedding' not in result:
+                logging.error("No embedding returned from Gemini API")
+                return []
             return result['embedding']
         except Exception as e:
-            print(f"Error generating embedding: {e}")
+            logging.error(f"Error generating embedding for text: {e}", exc_info=True)
             return []
