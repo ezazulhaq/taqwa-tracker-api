@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
@@ -127,6 +127,14 @@ def get_ayahs_by_surah(
             example=1
         )
     ],
+    ayah_no: Annotated[
+        Optional[int],
+        Query(
+            ge=1,
+            title="Ayah Number",
+            description="Optional specific Ayah number to retrieve from the Surah. If not provided, all Ayahs are returned."
+        )
+    ] = None,
     translator: Annotated[
         str,
         Query(
@@ -140,6 +148,12 @@ def get_ayahs_by_surah(
         ayahDetails: list[AyahDetails] = quran.get_ayahs(surah_no, translator, session)
         if not ayahDetails:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ayahs not found")
+        
+        # Filter by specific ayah if provided
+        if ayah_no is not None:
+            ayahDetails = [ayah for ayah in ayahDetails if ayah.ayah_no == ayah_no]
+            if not ayahDetails:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Ayah {ayah_no} not found in Surah {surah_no}")
         
         return ayahDetails
     except Exception as e:
