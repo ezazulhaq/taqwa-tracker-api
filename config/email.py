@@ -6,7 +6,7 @@ load_dotenv()
 class ResendConfig:
     
     def __init__(self, api_url, api_key, from_email, app_name, front_end_url):
-        self._api_url = api_url
+        self.__api_url = api_url
         self.__api_key = api_key
         self.__from_email = from_email
         self.__app_name = app_name
@@ -14,7 +14,7 @@ class ResendConfig:
         
     @property
     def api_url(self):
-        return self._api_url
+        return self.__api_url
         
     @property
     def api_key(self):
