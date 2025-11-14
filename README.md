@@ -15,6 +15,8 @@ A comprehensive FastAPI microservice for Islamic guidance and Quranic data acces
 - **Multi-LLM Support**: OpenRouter and Google Gemini integration
 - **Comprehensive Audit System**: Security logging and user activity tracking
 - **Email Services**: User verification and notification system
+- **Feedback System**: User feedback collection with email notifications
+- **Admin Panel**: Administrative endpoints for user and audit management
 
 ## Project Structure
 
@@ -40,14 +42,20 @@ taqwa-tracker-api/
 │   ├── entity.py           # Chat and conversation entities
 │   ├── model.py            # Chat request/response models
 │   └── service.py          # Chat management service
+├── feedback/                # Feedback & Support Domain
+│   ├── entity.py           # Feedback entities
+│   ├── model.py            # Feedback request/response models
+│   └── service.py          # Feedback processing service
 ├── quran/                   # Quranic Data Domain
 │   ├── entity.py           # Surah and ayah entities
 │   ├── model.py            # Quran response models
 │   └── service.py          # Quranic data service
 ├── routers/                 # API Route Handlers
+│   ├── admin.py            # Admin management endpoints
 │   ├── audit.py            # Audit endpoints
 │   ├── auth.py             # Authentication endpoints
 │   ├── chat.py             # Chat endpoints
+│   ├── feedback.py         # Feedback endpoints
 │   ├── quran.py            # Quran endpoints
 │   ├── status.py           # Health check endpoints
 │   └── user.py             # User profile endpoints
@@ -118,6 +126,7 @@ GEMINI_API_KEY=your-gemini-api-key
 GEMINI_MODEL_EMBED=models/text-embedding-004
 
 # Resend Email Configuration
+RESEND_API_URL=https://api.resend.com/emails
 RESEND_API_KEY=your-resend-api-key
 RESEND_FROM_EMAIL=your-from-email
 APP_NAME="Your App Name"
@@ -194,9 +203,33 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `GET /chat/conversations/{conversation_id}` - Get conversation history
 - `DELETE /chat/conversations/{conversation_id}` - Delete a conversation
 
-### Audit & Monitoring
-- `GET /audit/audit-logs` - Get all audit logs (admin only)
+### Feedback & Support
+- `POST /support/feedback` - Submit user feedback
+  - **Request Body**:
+    ```json
+    {
+      "user_id": "optional-uuid",
+      "category": "optional-category",
+      "email": "user@example.com",
+      "content": "Feedback message"
+    }
+    ```
+  - **Response**:
+    ```json
+    {
+      "id": "feedback-uuid",
+      "message": "Feedback submitted successfully",
+      "email_sent": true
+    }
+    ```
+  - **Rate Limited**: 3 requests per time window
+
+### Admin Management
+- `GET /admin/audit-logs` - Get all audit logs (admin only)
   - **Query Parameters**: `limit`, `email`, `event_type`
+- `GET /admin/users` - Get all users (admin only)
+  - **Query Parameters**: `skip`, `limit`
+- `POST /admin/users/{user_id}/unlock` - Unlock user account (admin only)
 
 ## AI Agent Capabilities
 
@@ -238,6 +271,7 @@ The AI agent provides comprehensive Islamic assistance through various tools:
 - `messages` - Individual chat messages with metadata
 - `user_profiles` - User preferences and location data
 - `agent_executions` - AI agent execution logs and analytics
+- `feedback` - User feedback and support requests
 - `surahs` - Quranic surah data
 - `v_surah_details` - Detailed ayah view with translations
 
@@ -347,6 +381,17 @@ curl -X POST "http://localhost:8000/chat/agent" \
     "message": "What are today\'s prayer times?",
     "location": "New York, NY",
     "timezone": "America/New_York"
+  }'
+```
+
+### Submit Feedback
+```bash
+curl -X POST "http://localhost:8000/support/feedback" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "category": "suggestion",
+    "content": "Great app! Would love to see more features."
   }'
 ```
 
