@@ -5,11 +5,16 @@ load_dotenv()
 
 class ResendConfig:
     
-    def __init__(self, api_key, from_email, app_name, front_end_url):
+    def __init__(self, api_url, api_key, from_email, app_name, front_end_url):
+        self.__api_url = api_url
         self.__api_key = api_key
         self.__from_email = from_email
         self.__app_name = app_name
         self.__front_end_url = front_end_url
+        
+    @property
+    def api_url(self):
+        return self.__api_url
         
     @property
     def api_key(self):
@@ -29,6 +34,7 @@ class ResendConfig:
     
 
 config = ResendConfig(
+    api_url=os.getenv("RESEND_API_URL", "https://api.resend.com/emails"),
     api_key=os.getenv("RESEND_API_KEY"),
     from_email=os.getenv("RESEND_FROM_EMAIL"),
     app_name=os.getenv("APP_NAME", "The Taqwa Tracker"),

@@ -15,6 +15,8 @@ A comprehensive FastAPI microservice for Islamic guidance and Quranic data acces
 - **Multi-LLM Support**: OpenRouter and Google Gemini integration
 - **Comprehensive Audit System**: Security logging and user activity tracking
 - **Email Services**: User verification and notification system
+- **Feedback System**: User feedback collection with email notifications
+- **Admin Panel**: Administrative endpoints for user and audit management
 
 ## Project Structure
 
@@ -40,14 +42,20 @@ taqwa-tracker-api/
 │   ├── entity.py           # Chat and conversation entities
 │   ├── model.py            # Chat request/response models
 │   └── service.py          # Chat management service
+├── feedback/                # Feedback & Support Domain
+│   ├── entity.py           # Feedback entities
+│   ├── model.py            # Feedback request/response models
+│   └── service.py          # Feedback processing service
 ├── quran/                   # Quranic Data Domain
 │   ├── entity.py           # Surah and ayah entities
 │   ├── model.py            # Quran response models
 │   └── service.py          # Quranic data service
 ├── routers/                 # API Route Handlers
+│   ├── admin.py            # Admin management endpoints
 │   ├── audit.py            # Audit endpoints
 │   ├── auth.py             # Authentication endpoints
 │   ├── chat.py             # Chat endpoints
+│   ├── feedback.py         # Feedback endpoints
 │   ├── quran.py            # Quran endpoints
 │   ├── status.py           # Health check endpoints
 │   └── user.py             # User profile endpoints
@@ -96,6 +104,12 @@ TAQWA_TRACKER_DB_USERNAME=your-username
 TAQWA_TRACKER_DB_PASSWORD=your-password
 TAQWA_TRACKER_DB_PORT=5432
 
+# JWT Configuration
+JWT_SECRET_KEY=your-jwt-secret-key
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
+
 # Pinecone Configuration
 PINECONE_API_KEY=your-pinecone-api-key
 PINECONE_ENVIRONMENT=your-pinecone-environment
@@ -110,6 +124,18 @@ OPENROUTER_MODEL_OPENAI=openai/gpt-4
 # Google Gemini Configuration
 GEMINI_API_KEY=your-gemini-api-key
 GEMINI_MODEL_EMBED=models/text-embedding-004
+
+# Resend Email Configuration
+RESEND_API_URL=https://api.resend.com/emails
+RESEND_API_KEY=your-resend-api-key
+RESEND_FROM_EMAIL=your-from-email
+APP_NAME="Your App Name"
+FRONTEND_URL="https://your-frontend-url.com"
+
+# Security Configuration
+MAX_LOGIN_ATTEMPTS=5
+LOCKOUT_DURATION_MINUTES=15
+RATE_LIMIT_REQUESTS=10
 ```
 
 ### Run Development Server
@@ -142,9 +168,14 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `DELETE /user/sessions/{session_id}` - Revoke session
 
 ### Quranic Data
-- `GET /quran/surahs/{surah_no}` - Get ayahs for a specific surah (1-114)
-  - **Parameters**: `surah_no` (integer, 1-114)
-  - **Response**: List of ayah details with Arabic text and translations
+- `GET /quran/surahs` - Get all 114 Surahs with metadata
+  - **Response**: Complete list of Surahs with names, total ayahs, type (Meccan/Medinan), and order revealed
+- `GET /quran/ayahs` - Get ayahs with flexible filtering
+  - **Query Parameters**: 
+    - `surah_no` (required, integer, 1-114) - Surah number
+    - `ayah_no` (optional, integer) - Specific ayah number within the surah
+    - `translator` (optional, string, default: "Ahmed Raza") - Translation source
+  - **Response**: List of ayah details with Arabic text, translations, and metadata
 
 ### AI Chat Agent
 - `POST /chat/agent` - Main conversational AI endpoint
@@ -172,9 +203,33 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `GET /chat/conversations/{conversation_id}` - Get conversation history
 - `DELETE /chat/conversations/{conversation_id}` - Delete a conversation
 
-### Audit & Monitoring
-- `GET /audit/audit-logs` - Get all audit logs (admin only)
+### Feedback & Support
+- `POST /support/feedback` - Submit user feedback
+  - **Request Body**:
+    ```json
+    {
+      "user_id": "optional-uuid",
+      "category": "optional-category",
+      "email": "user@example.com",
+      "content": "Feedback message"
+    }
+    ```
+  - **Response**:
+    ```json
+    {
+      "id": "feedback-uuid",
+      "message": "Feedback submitted successfully",
+      "email_sent": true
+    }
+    ```
+  - **Rate Limited**: 3 requests per time window
+
+### Admin Management
+- `GET /admin/audit-logs` - Get all audit logs (admin only)
   - **Query Parameters**: `limit`, `email`, `event_type`
+- `GET /admin/users` - Get all users (admin only)
+  - **Query Parameters**: `skip`, `limit`
+- `POST /admin/users/{user_id}/unlock` - Unlock user account (admin only)
 
 ## AI Agent Capabilities
 
@@ -216,6 +271,7 @@ The AI agent provides comprehensive Islamic assistance through various tools:
 - `messages` - Individual chat messages with metadata
 - `user_profiles` - User preferences and location data
 - `agent_executions` - AI agent execution logs and analytics
+- `feedback` - User feedback and support requests
 - `surahs` - Quranic surah data
 - `v_surah_details` - Detailed ayah view with translations
 
@@ -328,9 +384,27 @@ curl -X POST "http://localhost:8000/chat/agent" \
   }'
 ```
 
-### Quranic Verse Lookup
+### Submit Feedback
 ```bash
-curl -X GET "http://localhost:8000/quran/surahs/1"
+curl -X POST "http://localhost:8000/support/feedback" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "category": "suggestion",
+    "content": "Great app! Would love to see more features."
+  }'
+```
+
+### Quranic Data Access
+```bash
+# Get all Surahs
+curl -X GET "http://localhost:8000/quran/surahs"
+
+# Get all ayahs from Surah Al-Fatihah (1)
+curl -X GET "http://localhost:8000/quran/ayahs?surah_no=1"
+
+# Get specific ayah with custom translator
+curl -X GET "http://localhost:8000/quran/ayahs?surah_no=1&ayah_no=1&translator=Dr.%20Muhammad%20Iqbal"
 ```
 
 ## Contributing

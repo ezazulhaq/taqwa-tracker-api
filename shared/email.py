@@ -19,7 +19,7 @@ class EmailService:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(
-                    "https://api.resend.com/emails",
+                    config.api_url,
                     headers={
                         "Authorization": f"Bearer {config.api_key}",
                         "Content-Type": "application/json"
@@ -27,7 +27,6 @@ class EmailService:
                     json={
                         "from": config.from_email,
                         "to": [to_email],
-                        "bcc": "ezazulhaq.it@gmail.com",
                         "subject": subject,
                         "html": html_content
                     },
