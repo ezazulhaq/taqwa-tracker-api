@@ -149,7 +149,7 @@ class AuthService:
         token: Oauth2Dep,
         session: SessionDep
     ) -> User:
-        """Get current user from JWT token"""
+        """Get current authenticated user from JWT token"""
         credentials_exception = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -160,9 +160,8 @@ class AuthService:
             payload = jwt.decode(token, jwt_config.secret_key, algorithms=[jwt_config.algorithm])
             email: str = payload.get("sub")
             token_type: str = payload.get("type")
-            role: str = payload.get("role")
             
-            if email is None or role is None or token_type != "access":
+            if email is None or token_type != "access":
                 raise credentials_exception
                 
             token_data = TokenData(email=email)
@@ -174,12 +173,21 @@ class AuthService:
             raise credentials_exception
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
+        
+        return user
+
+    @staticmethod
+    async def get_privileged_user(
+        token: Oauth2Dep,
+        session: SessionDep
+    ) -> User:
+        """Get current user and verify admin or dev role"""
+        user = await AuthService.get_current_user(token, session)
         if user.role not in ["admin", "dev"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access forbidden. Admin or Dev role required."
             )
-        
         return user
 
     @staticmethod
