@@ -1,6 +1,9 @@
 import tomllib
 from pathlib import Path
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from config.cors import origins, methods, headers
+
 from routers import admin, auth, chat, feedback, library, quran, status, user
 
 # Read version from pyproject.toml
@@ -14,6 +17,14 @@ app = FastAPI(
     docs_url="/api/documentation",
     redoc_url="/api/re-documentation",
     openapi_url="/api/openapi.json"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=methods,
+    allow_headers=headers,
 )
 
 app.include_router(status.router)
