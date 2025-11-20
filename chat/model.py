@@ -1,36 +1,28 @@
+import uuid
+
 from datetime import datetime
-from typing import Callable, Dict, List, Optional
-from pydantic import BaseModel
+from typing import Any, Dict, Optional
+from pydantic import BaseModel, Field
 
 
-class ChatMessage(BaseModel):
+class MessageRequest(BaseModel):
+    user_id: uuid.UUID
+    conversation_id: Optional[uuid.UUID] = None
+    message: str = Field(..., min_length=1)
+
+class MessageResponse(BaseModel):
+    conversation_id: uuid.UUID
+    message_id: uuid.UUID
     role: str
     content: str
-    timestamp: Optional[datetime] = None
+    metadata: Optional[Dict[str, Any]] = None
+    created_at: datetime
 
-class AgentTool:
-    def __init__(self, name: str, description: str, parameters: Dict, function: Callable):
-        self.name = name
-        self.description = description
-        self.parameters = parameters
-        self.function = function
-
-class AgentStep(BaseModel):
-    step: int
-    action: str
-    tool_used: str
-    result: str
-    reasoning: str
-
-class ChatRequest(BaseModel):
-    message: str
-    conversation_id: Optional[str] = None
-    location: Optional[str] = None
-    timezone: Optional[str] = None
-
-class ChatResponse(BaseModel):
-    response: str
-    conversation_id: str
-    message_id: str
-    agent_steps: List[AgentStep]
-    tools_used: List[str]
+class ConversationResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    message_count: int
+    last_message_at: Optional[datetime]

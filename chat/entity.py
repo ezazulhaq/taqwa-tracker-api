@@ -9,7 +9,7 @@ class Conversation(SQLModel, table=True):
     __tablename__ = "conversations"
     
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="auth.users.id")
+    user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id")
     title: str = Field(default="Islamic Guidance Chat")
     created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
