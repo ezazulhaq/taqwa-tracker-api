@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config.cors import origins, methods, headers
 
-from routers import admin, auth, chat, feedback, library, quran, status, user
+from routers import admin, auth, chat, feedback, hadith, library, quran, status, user
 
 # Read version from pyproject.toml
 with open(Path(__file__).parent / "pyproject.toml", "rb") as f:
@@ -30,6 +30,7 @@ app.add_middleware(
 app.include_router(status.router)
 app.include_router(auth.router)
 app.include_router(quran.router)
+app.include_router(hadith.router)
 app.include_router(library.router)
 app.include_router(chat.router)
 app.include_router(user.router)
