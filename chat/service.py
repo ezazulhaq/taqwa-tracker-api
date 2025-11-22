@@ -1,7 +1,8 @@
 import uuid
-
+import hashlib
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from functools import lru_cache
 
 from pinecone import Pinecone
 from sqlmodel import Session, select
@@ -11,13 +12,26 @@ from config.pinecone import config as pinecone_config
 from config.gemini import config as gemini_config, genai_client
 from chat.entity import Conversation, Message, AgentExecution
 
+# Simple in-memory cache for embeddings (can be replaced with Redis for production)
+_embedding_cache = {}
+
 class EmbeddingService:
     def __init__(self):
         self.client = genai_client
         self.model = gemini_config.embedding_model
-        
+    
+    def _get_cache_key(self, text: str) -> str:
+        """Generate cache key from text"""
+        return hashlib.md5(text.encode()).hexdigest()
+    
     async def get_embedding(self, text: str) -> List[float]:
-        """Generate embeddings using OpenRouter embedding model"""
+        """Generate embeddings using OpenRouter embedding model with caching"""
+        cache_key = self._get_cache_key(text)
+        
+        # Check cache first
+        if cache_key in _embedding_cache:
+            return _embedding_cache[cache_key]
+        
         try:
             response = self.client.embed_content(
                 model=self.model,
@@ -25,7 +39,16 @@ class EmbeddingService:
                 task_type="retrieval_document"
             )
             
-            return response["embedding"]
+            embedding = response["embedding"]
+            
+            # Cache the result (limit cache size to 1000 entries)
+            if len(_embedding_cache) > 1000:
+                # Remove oldest entry (simple FIFO)
+                _embedding_cache.pop(next(iter(_embedding_cache)))
+            
+            _embedding_cache[cache_key] = embedding
+            return embedding
+            
         except Exception as e:
             print(f"Error generating embedding: {str(e)}")
             raise
@@ -35,15 +58,14 @@ class VectorStoreService:
         self.pc = Pinecone(api_key=pinecone_config.api_key)
         self.embedding_service = EmbeddingService()
         
-        # Index mappings
-        # All using 768-dimension embeddings
+        # Index mappings - All using 768-dimension embeddings
         self.indexes = {
             "quran": self.pc.Index("quran"),
             "hadith": self.pc.Index("hadith"),
             "islam": self.pc.Index("islam")
         }
     
-    async def search_quran(self, query: str, top_k: int = 5) -> List[Dict]:
+    async def search_quran(self, query: str, top_k: int = 3) -> List[Dict]:
         """Search Quran knowledge base"""
         try:
             embedding = await self.embedding_service.get_embedding(query)
@@ -66,7 +88,7 @@ class VectorStoreService:
             print(f"Error searching Quran: {str(e)}")
             return []
     
-    async def search_sahih_bukhari(self, query: str, top_k: int = 5) -> List[Dict]:
+    async def search_sahih_bukhari(self, query: str, top_k: int = 3) -> List[Dict]:
         """Search Sahih Bukhari hadiths"""
         try:
             embedding = await self.embedding_service.get_embedding(query)
@@ -88,7 +110,7 @@ class VectorStoreService:
             print(f"Error searching Sahih Bukhari: {str(e)}")
             return []
     
-    async def search_sahih_muslim(self, query: str, top_k: int = 5) -> List[Dict]:
+    async def search_sahih_muslim(self, query: str, top_k: int = 3) -> List[Dict]:
         """Search Sahih Muslim hadiths"""
         try:
             embedding = await self.embedding_service.get_embedding(query)
@@ -110,7 +132,7 @@ class VectorStoreService:
             print(f"Error searching Sahih Muslim: {str(e)}")
             return []
     
-    async def search_riyad_us_saliheen(self, query: str, top_k: int = 5) -> List[Dict]:
+    async def search_riyad_us_saliheen(self, query: str, top_k: int = 3) -> List[Dict]:
         """Search Riyad Us Saliheen"""
         try:
             embedding = await self.embedding_service.get_embedding(query)
@@ -132,7 +154,7 @@ class VectorStoreService:
             print(f"Error searching Riyad Us Saliheen: {str(e)}")
             return []
     
-    async def search_prophet_biography(self, query: str, top_k: int = 5) -> List[Dict]:
+    async def search_prophet_biography(self, query: str, top_k: int = 3) -> List[Dict]:
         """Search Prophet Muhammad biography"""
         try:
             embedding = await self.embedding_service.get_embedding(query)
@@ -153,7 +175,7 @@ class VectorStoreService:
             print(f"Error searching Prophet biography: {str(e)}")
             return []
     
-    async def search_islamic_history(self, query: str, top_k: int = 5) -> List[Dict]:
+    async def search_islamic_history(self, query: str, top_k: int = 3) -> List[Dict]:
         """Search Islamic history including Shia-Sunni context"""
         try:
             embedding = await self.embedding_service.get_embedding(query)
@@ -207,7 +229,7 @@ class ConversationService:
         self,
         session: Session,
         conversation_id: uuid.UUID,
-        limit: int = 10
+        limit: int = 5  # Reduced from 10 to 5
     ) -> List[Dict[str, str]]:
         """Retrieve recent conversation messages"""
         statement = (

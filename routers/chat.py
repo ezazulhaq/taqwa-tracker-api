@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Annotated, List
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlmodel import Session
 
 from chat.agent import IslamicAgent
@@ -22,14 +22,33 @@ SessionDep = Annotated[Session, Depends(database.get_db_session)]
 AgentDep = Annotated[IslamicAgent, Depends()]
 ConversationDep = Annotated[ConversationService, Depends()]
 
+
+def save_agent_execution_background(
+    session: Session,
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    user_query: str,
+    result: dict
+):
+    """Background task to save agent execution"""
+    try:
+        conversation_service = ConversationService()
+        conversation_service.save_agent_execution(
+            session, conversation_id, message_id, user_query, result
+        )
+    except Exception as e:
+        print(f"Error saving agent execution in background: {str(e)}")
+
+
 @router.post("/agent", response_model=MessageResponse)
 async def chat_endpoint(
     request: MessageRequest,
     session: SessionDep,
     conversation: ConversationDep,
-    agent: AgentDep
+    agent: AgentDep,
+    background_tasks: BackgroundTasks
 ):
-    """Main chat endpoint"""
+    """Main chat endpoint with optimized performance"""
     try:
         # Get or create conversation
         conversation_id = conversation.get_or_create_conversation(
@@ -44,7 +63,7 @@ async def chat_endpoint(
         # Get conversation history
         history = conversation.get_conversation_history(session, conversation_id)
         
-        # Run agent
+        # Run agent (this is now much faster with parallel execution)
         result = await agent.chat(request.message, history)
         
         # Save assistant message
@@ -59,9 +78,14 @@ async def chat_endpoint(
             }
         )
         
-        # Save agent execution log
-        conversation.save_agent_execution(
-            session, conversation_id, assistant_message_id, request.message, result
+        # Save agent execution log in background (non-blocking)
+        background_tasks.add_task(
+            save_agent_execution_background,
+            session,
+            conversation_id,
+            assistant_message_id,
+            request.message,
+            result
         )
         
         return MessageResponse(
@@ -73,11 +97,15 @@ async def chat_endpoint(
                 "tools_used": result["tools_used"],
                 "execution_time_ms": result["execution_time_ms"]
             },
-            created_at = datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc)
         )
         
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=str(e)
+        )
+
 
 @router.get("/conversations/{user_id}", response_model=List[ConversationResponse])
 async def get_user_conversations(
@@ -90,7 +118,11 @@ async def get_user_conversations(
         conversations = conversation.get_user_conversations(session, user_id)
         return [ConversationResponse(**conv) for conv in conversations]
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=str(e)
+        )
+
 
 @router.get("/conversations/{conversation_id}/messages", response_model=List[MessageResponse])
 async def get_conversation_messages(
@@ -102,7 +134,11 @@ async def get_conversation_messages(
     try:
         return conversation.get_conversation_messages(session, conversation_id)
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=str(e)
+        )
+
 
 @router.delete("/conversations/{conversation_id}")
 async def delete_conversation(
@@ -115,9 +151,15 @@ async def delete_conversation(
     try:
         success = conversation.delete_conversation(session, conversation_id, user_id)
         if not success:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Conversation not found"
+            )
         return {"status": "success", "message": "Conversation deleted"}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=str(e)
+        )

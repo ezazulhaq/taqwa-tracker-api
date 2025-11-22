@@ -1,6 +1,8 @@
 import json
 import time
+import asyncio
 from typing import Any, Dict, List
+from functools import lru_cache
 
 from openai import AsyncOpenAI
 from config.openrouter import config as openrouter_config
@@ -16,6 +18,9 @@ class IslamicAgent:
         )
         self.model = openrouter_config.openapi_model
         self.temperature = 0.2
+        
+        # Cache for vector store service (singleton pattern)
+        self._vector_store = None
         
         self.system_prompt = """
             # Islamic Knowledge Assistant
@@ -48,6 +53,11 @@ class IslamicAgent:
             4. For practical guidance → Use search_riyad_us_saliheen
             5. For Prophet's life → Use search_prophet_biography
             6. For historical context → Use search_islamic_history
+
+            ### CRITICAL: Use ONLY ONE tool per query unless absolutely necessary
+            - Most queries can be answered with a single tool call
+            - Only use multiple tools if the query explicitly requires different sources
+            - Prefer broader searches over multiple narrow ones
 
             ### Citation Standards
             - Always include source references (Quran: Surah X, Ayah Y)
@@ -188,13 +198,18 @@ class IslamicAgent:
             }
         ]
     
+    @property
+    def vector_store(self):
+        """Lazy load and cache vector store service"""
+        if self._vector_store is None:
+            self._vector_store = VectorStoreService()
+        return self._vector_store
+    
     async def execute_function(self, function_name: str, arguments: Dict) -> str:
         """Execute the appropriate function based on name"""
-        vector_store = VectorStoreService()
-        
         try:
             if function_name == "search_quran":
-                results = await vector_store.search_quran(arguments["query"])
+                results = await self.vector_store.search_quran(arguments["query"], top_k=3)
                 if not results:
                     return "No relevant Quranic verses found for this query."
                 
@@ -206,16 +221,14 @@ class IslamicAgent:
                 return "\n\n".join(formatted_results)
             
             elif function_name == "get_specific_ayah":
-                # Note: You would implement actual API call to your n8n workflow here
-                # For now, using semantic search as fallback
                 query = f"Surah {arguments['surah_id']} Ayah {arguments['ayah_number']}"
-                results = await vector_store.search_quran(query, top_k=1)
+                results = await self.vector_store.search_quran(query, top_k=1)
                 if results:
                     return f"Surah {arguments['surah_id']}, Ayah {arguments['ayah_number']}: {results[0].get('text', '')}"
                 return f"Could not retrieve Surah {arguments['surah_id']}, Ayah {arguments['ayah_number']}"
             
             elif function_name == "search_sahih_bukhari":
-                results = await vector_store.search_sahih_bukhari(arguments["query"])
+                results = await self.vector_store.search_sahih_bukhari(arguments["query"], top_k=3)
                 if not results:
                     return "No relevant Hadith found in Sahih Bukhari."
                 
@@ -226,7 +239,7 @@ class IslamicAgent:
                 return "\n\n".join(formatted_results)
             
             elif function_name == "search_sahih_muslim":
-                results = await vector_store.search_sahih_muslim(arguments["query"])
+                results = await self.vector_store.search_sahih_muslim(arguments["query"], top_k=3)
                 if not results:
                     return "No relevant Hadith found in Sahih Muslim."
                 
@@ -237,7 +250,7 @@ class IslamicAgent:
                 return "\n\n".join(formatted_results)
             
             elif function_name == "search_riyad_us_saliheen":
-                results = await vector_store.search_riyad_us_saliheen(arguments["query"])
+                results = await self.vector_store.search_riyad_us_saliheen(arguments["query"], top_k=3)
                 if not results:
                     return "No relevant guidance found in Riyad Us Saliheen."
                 
@@ -248,7 +261,7 @@ class IslamicAgent:
                 return "\n\n".join(formatted_results)
             
             elif function_name == "search_prophet_biography":
-                results = await vector_store.search_prophet_biography(arguments["query"])
+                results = await self.vector_store.search_prophet_biography(arguments["query"], top_k=3)
                 if not results:
                     return "No relevant information found in Prophet's biography."
                 
@@ -256,7 +269,7 @@ class IslamicAgent:
                 return "\n\n".join(formatted_results)
             
             elif function_name == "search_islamic_history":
-                results = await vector_store.search_islamic_history(arguments["query"])
+                results = await self.vector_store.search_islamic_history(arguments["query"], top_k=3)
                 if not results:
                     return "No relevant historical information found."
                 
@@ -268,11 +281,46 @@ class IslamicAgent:
         except Exception as e:
             return f"Error executing {function_name}: {str(e)}"
     
+    async def execute_functions_parallel(self, tool_calls) -> List[Dict[str, Any]]:
+        """Execute multiple function calls in parallel"""
+        tasks = []
+        for tool_call in tool_calls:
+            function_name = tool_call.function.name
+            arguments = json.loads(tool_call.function.arguments)
+            
+            task = self.execute_function(function_name, arguments)
+            tasks.append({
+                "task": task,
+                "tool_call_id": tool_call.id,
+                "function_name": function_name,
+                "arguments": arguments
+            })
+        
+        # Execute all functions in parallel
+        results = await asyncio.gather(*[t["task"] for t in tasks], return_exceptions=True)
+        
+        # Combine results with metadata
+        function_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                result_text = f"Error: {str(result)}"
+            else:
+                result_text = result
+            
+            function_results.append({
+                "tool_call_id": tasks[i]["tool_call_id"],
+                "function_name": tasks[i]["function_name"],
+                "arguments": tasks[i]["arguments"],
+                "result": result_text
+            })
+        
+        return function_results
+    
     async def chat(
         self,
         user_query: str,
         conversation_history: List[Dict[str, str]],
-        max_iterations: int = 5
+        max_iterations: int = 3  # Reduced from 5 to 3
     ) -> Dict[str, Any]:
         """
         Main agent orchestration with function calling
@@ -282,9 +330,9 @@ class IslamicAgent:
         steps_executed = []
         tools_used = []
         
-        # Build messages with conversation history
+        # Build messages with conversation history (reduced to last 5 for performance)
         messages = [{"role": "system", "content": self.system_prompt}]
-        messages.extend(conversation_history[-10:])  # Last 10 messages (context window)
+        messages.extend(conversation_history[-5:])  # Reduced from 10 to 5
         messages.append({"role": "user", "content": user_query})
         
         iteration = 0
@@ -298,7 +346,8 @@ class IslamicAgent:
                     messages=messages,
                     tools=self.tools,
                     tool_choice="auto",
-                    temperature=self.temperature
+                    temperature=self.temperature,
+                    #max_tokens=1000  # Limit response tokens for faster processing
                 )
                 
                 assistant_message = response.choices[0].message
@@ -322,31 +371,24 @@ class IslamicAgent:
                         ]
                     })
                     
-                    # Execute each tool call
-                    for tool_call in assistant_message.tool_calls:
-                        function_name = tool_call.function.name
-                        arguments = json.loads(tool_call.function.arguments)
-                        
-                        tools_used.append(function_name)
-                        
-                        # Execute function
-                        function_result = await self.execute_function(
-                            function_name, 
-                            arguments
-                        )
-                        
+                    # Execute all tool calls in parallel
+                    function_results = await self.execute_functions_parallel(assistant_message.tool_calls)
+                    
+                    # Add results to steps and tools_used
+                    for fr in function_results:
+                        tools_used.append(fr["function_name"])
                         steps_executed.append({
-                            "tool": function_name,
-                            "arguments": arguments,
-                            "result": function_result[:500]  # Truncate for logging
+                            "tool": fr["function_name"],
+                            "arguments": fr["arguments"],
+                            "result": fr["result"][:500]  # Truncate for logging
                         })
                         
                         # Add function result to messages
                         messages.append({
                             "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "name": function_name,
-                            "content": function_result
+                            "tool_call_id": fr["tool_call_id"],
+                            "name": fr["function_name"],
+                            "content": fr["result"]
                         })
                     
                     # Continue to next iteration to get final response
