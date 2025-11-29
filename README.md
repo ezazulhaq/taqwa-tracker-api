@@ -47,9 +47,9 @@ taqwa-tracker-api/
 │   ├── model.py            # Feedback request/response models
 │   └── service.py          # Feedback processing service
 ├── quran/                   # Quranic Data Domain
-│   ├── entity.py           # Surah and ayah entities
+│   ├── entity.py           # Surah, ayah, language, and translator entities
 │   ├── model.py            # Quran response models
-│   └── service.py          # Quranic data service
+│   └── service.py          # Quranic data and translator service
 ├── routers/                 # API Route Handlers
 │   ├── admin.py            # Admin management endpoints
 │   ├── audit.py            # Audit endpoints
@@ -176,6 +176,13 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
     - `ayah_no` (optional, integer) - Specific ayah number within the surah
     - `translator` (optional, string, default: "Ahmed Raza") - Translation source
   - **Response**: List of ayah details with Arabic text, translations, and metadata
+- `GET /quran/languages` - Get all available translation languages
+  - **Response**: List of language codes and names for Quranic translations
+- `GET /quran/translators` - Get available translators with filtering
+  - **Query Parameters**:
+    - `language_code` (optional, string) - Filter by language code (e.g., 'en', 'ar', 'ur')
+    - `active_only` (optional, boolean, default: true) - Return only active translators
+  - **Response**: List of translators with names, language codes, and status
 
 ### AI Chat Agent
 - `POST /chat/agent` - Main conversational AI endpoint
@@ -405,6 +412,15 @@ curl -X GET "http://localhost:8000/quran/ayahs?surah_no=1"
 
 # Get specific ayah with custom translator
 curl -X GET "http://localhost:8000/quran/ayahs?surah_no=1&ayah_no=1&translator=Dr.%20Muhammad%20Iqbal"
+
+# Get all available languages
+curl -X GET "http://localhost:8000/quran/languages"
+
+# Get all translators
+curl -X GET "http://localhost:8000/quran/translators"
+
+# Get translators for specific language
+curl -X GET "http://localhost:8000/quran/translators?language_code=en"
 ```
 
 ## Contributing
