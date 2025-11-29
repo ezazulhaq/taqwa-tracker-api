@@ -1,5 +1,20 @@
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
+
+class Language(SQLModel, table=True):
+    __tablename__ = "languages"
+    
+    language_code: str = Field(primary_key=True, max_length=3)
+    language_name: str = Field(max_length=255)
+
+class Translator(SQLModel, table=True):
+    __tablename__ = "translators"
+    
+    translator_id: int = Field(primary_key=True)
+    name: str = Field(max_length=255)
+    language_code: Optional[str] = Field(default=None, max_length=3, foreign_key="languages.language_code")
+    full_name: Optional[str] = Field(default="")
+    is_active: bool = Field(default=True)
 
 class Surah(SQLModel, table=True):
     __tablename__ = "surahs"

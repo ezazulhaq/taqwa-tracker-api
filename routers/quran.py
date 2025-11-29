@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
 from config.database import get_db_session
-from quran.model import AyahDetails, SurahResponse
+from quran.model import AyahDetails, SurahResponse, LanguageResponse, TranslatorResponse
 from quran.service import QuranService
 from starlette import status
 
@@ -158,3 +158,56 @@ def get_ayahs_by_surah(
         return ayahDetails
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error fetching surahs: {str(e)}")
+
+@router.get(
+    "/languages",
+    status_code=status.HTTP_200_OK,
+    response_model=list[LanguageResponse],
+    summary="Get All Languages",
+    description="Retrieve all available languages for Quranic translations."
+)
+def get_languages(
+    session: SessionDep,
+    quran: QuranDep
+):
+    try:
+        languages = quran.get_languages(session)
+        if not languages:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No languages found")
+        return languages
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching languages")
+
+@router.get(
+    "/translators",
+    status_code=status.HTTP_200_OK,
+    response_model=list[TranslatorResponse],
+    summary="Get All Translators",
+    description="Retrieve all available translators, optionally filtered by language."
+)
+def get_translators(
+    session: SessionDep,
+    quran: QuranDep,
+    language_code: Annotated[
+        str,
+        Query(
+            max_length=2,
+            title="Language Code",
+            description="Filter translators by language code (e.g., 'en', 'ar', 'ur')"
+        )
+    ] = "en",
+    active_only: Annotated[
+        bool,
+        Query(
+            title="Active Only",
+            description="Return only active translators"
+        )
+    ] = True
+):
+    try:
+        translators = quran.get_translators(session, language_code, active_only)
+        if not translators:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No translators found")
+        return translators
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error fetching translators")
