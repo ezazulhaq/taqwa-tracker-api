@@ -1,6 +1,17 @@
 from typing import Optional
 from pydantic import BaseModel
 
+class LanguageResponse(BaseModel):
+    language_code: str
+    language_name: str
+
+class TranslatorResponse(BaseModel):
+    translator_id: int
+    name: str
+    language_code: Optional[str] = None
+    full_name: Optional[str] = None
+    is_active: bool = True
+
 class SurahResponse(BaseModel):
     surah_id: int
     name: str
