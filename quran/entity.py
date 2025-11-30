@@ -37,4 +37,5 @@ class VSurahDetails(SQLModel, table=True):
     ayah_no: int = Field(primary_key=True)
     arabic_text: str
     translation_text: str
+    translator_full_name: str
     translator_name: str = Field(primary_key=True)

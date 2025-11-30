@@ -40,6 +40,18 @@ CREATE TABLE ayahs (
     CONSTRAINT ayahs_surah_id_fkey FOREIGN key (surah_id) REFERENCES surahs (surah_id)
 );
 
+CREATE TABLE translations (
+    translation_id SERIAL NOT NULL,
+    ayah_id integer,
+    translator_id integer,
+    translation_text text,
+    PRIMARY KEY (translation_id),
+    CONSTRAINT translations_ayah_id_fkey FOREIGN key (ayah_id) REFERENCES ayahs (ayah_id),
+    CONSTRAINT translations_translator_id_fkey FOREIGN key (translator_id) REFERENCES translators (translator_id)
+);
+
+--DROP VIEW IF EXISTS v_surah_details;
+CREATE OR REPLACE VIEW v_surah_details AS
 SELECT
     s.surah_id AS surah_no,
     s.name AS surah_name_ar,
@@ -53,7 +65,8 @@ SELECT
         BOTH
         FROM t.translation_text
     ) AS translation_text,
-    r.full_name AS translator_name
+    r.full_name AS translator_full_name,
+    r.name AS translator_name
 FROM (
         (
             (
