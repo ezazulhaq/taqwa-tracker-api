@@ -93,7 +93,7 @@ def get_surah_info(
                             "ayah_no": 1,
                             "arabic_text": "بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ",
                             "translation_text": "In the name of Allah, the Beneficent, the Merciful.",
-                            "translator_name": "Dr. Muhammad Iqbal"
+                            "translator_name": "muhammadiqbal"
                         },
                         {
                             "surah_no": 1,
@@ -102,7 +102,7 @@ def get_surah_info(
                             "ayah_no": 2,
                             "arabic_text": "ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَـٰلَمِينَ",
                             "translation_text": "Praise be to Allah, Lord of the Worlds.",
-                            "translator_name": "Dr. Muhammad Iqbal"
+                            "translator_name": "muhammadiqbal"
                         }
                     ]
                 }
@@ -140,9 +140,9 @@ def get_ayahs_by_surah(
         Query(
             title="Translator Name",
             description="Name of the translator for the Quranic translation",
-            example="Ahmed Raza"
+            example="ahmedraza"
         )
-    ] = "Ahmed Raza"
+    ] = "ahmedraza"
     ):
     try:
         ayahDetails: list[AyahDetails] = quran.get_ayahs(surah_no, translator, session)
